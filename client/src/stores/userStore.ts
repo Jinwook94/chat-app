@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getItem, setItem } from '../services/storage';
+import { getItemSync, setItemSync } from '../services/storage';
 
 export interface User {
     id: string;
@@ -25,13 +25,13 @@ const defaultUser: User = {
 };
 
 // 로컬 스토리지에서 사용자 정보 불러오기
-const savedUser = getItem<User>('user') || defaultUser;
+const savedUser = getItemSync<User | null>('user', defaultUser);
 
 export const useUserStore = create<UserState>((set) => ({
     user: savedUser,
     isLoading: false,
     setUser: (user) => {
-        setItem('user', user);
+        setItemSync('user', user);
         set({ user });
     },
     updateUser: (data) =>
@@ -39,7 +39,7 @@ export const useUserStore = create<UserState>((set) => ({
             if (!state.user) return state;
 
             const updatedUser = { ...state.user, ...data };
-            setItem('user', updatedUser);
+            setItemSync('user', updatedUser);
             return { user: updatedUser };
         }),
     clearUser: () => {
