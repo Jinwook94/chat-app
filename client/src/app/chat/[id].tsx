@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TextInput as RNTextInput, TouchableOpacity } from 'react-native';
-import { Avatar, IconButton, Menu, TextInput, Button, Portal, Modal } from 'react-native-paper';
+import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TextInput as RNTextInput, TouchableOpacity, StatusBar } from 'react-native';
+import { IconButton, Avatar } from 'react-native-paper';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import ColorPicker from 'react-native-wheel-color-picker';
 import { ThemedText } from '@/src/components/ThemedText';
 import { ThemedView } from '@/src/components/ThemedView';
 import { useChatStore } from '@/src/stores/chatStore';
@@ -12,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ChatDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { chatRooms, messages, updateChatRoom, sendMessage, markMessagesAsRead, setChatBackgroundColor } = useChatStore();
+    const { chatRooms, messages, sendMessage, markMessagesAsRead } = useChatStore();
     const { user } = useUserStore();
     const { friends } = useFriendsStore();
     const insets = useSafeAreaInsets();
@@ -20,14 +19,7 @@ export default function ChatDetailScreen() {
     const chatRoom = chatRooms.find(room => room.id === id);
     const chatMessages = messages[id] || [];
 
-    const [menuVisible, setMenuVisible] = useState(false);
     const [messageText, setMessageText] = useState('');
-    const [renamingGroup, setRenamingGroup] = useState(false);
-    const [newGroupName, setNewGroupName] = useState('');
-    const [colorPickerVisible, setColorPickerVisible] = useState(false);
-    const [currentColor, setCurrentColor] = useState(chatRoom?.backgroundColor || '#F9FAFB');
-    const [isColorChanging, setIsColorChanging] = useState(false);
-
     const messageInputRef = useRef<RNTextInput>(null);
     const flatListRef = useRef<FlatList>(null);
 
@@ -66,29 +58,6 @@ export default function ChatDetailScreen() {
         messageInputRef.current?.focus();
     };
 
-    // 그룹 이름 변경
-    const handleRenameGroup = () => {
-        if (chatRoom.isGroup && newGroupName.trim() !== '') {
-            updateChatRoom(id, { name: newGroupName });
-        }
-        setRenamingGroup(false);
-        setMenuVisible(false);
-    };
-
-    // 색상 선택 완료
-    const handleColorComplete = () => {
-        setChatBackgroundColor(id, currentColor);
-        setColorPickerVisible(false);
-    };
-
-    // 메시지 발신자의 이름 가져오기
-    const getSenderName = (senderId: string) => {
-        if (senderId === user.id) return '나';
-
-        const sender = friends.find(friend => friend.id === senderId);
-        return sender ? sender.name : '알 수 없음';
-    };
-
     // 시간 형식화
     const formatTime = (timestamp: number) => {
         const date = new Date(timestamp);
@@ -101,182 +70,165 @@ export default function ChatDetailScreen() {
         return `${ampm} ${formattedHours}:${formattedMinutes}`;
     };
 
+    // 같은 날짜의 연속 메시지인지 확인
+    const isSameGroup = (currentIndex: number) => {
+        if (currentIndex === 0) return false;
+
+        const currentMsg = chatMessages[currentIndex];
+        const prevMsg = chatMessages[currentIndex - 1];
+
+        // 같은 보낸사람이고 5분 이내 메시지인지 확인
+        return currentMsg.senderId === prevMsg.senderId &&
+            currentMsg.createdAt - prevMsg.createdAt < 5 * 60 * 1000;
+    };
+
+    // 프로필 이미지 가져오기
+    const getProfileImage = (senderId: string) => {
+        if (senderId === user.id) return user.avatar;
+        const sender = friends.find(f => f.id === senderId);
+        return sender?.avatar || '';
+    };
+
+    const backgroundColor = chatRoom.backgroundColor || '#9bbbd4';
+
     return (
-        <>
+        <View style={{ flex: 1, backgroundColor }}>
+            <StatusBar barStyle="dark-content" backgroundColor={backgroundColor} />
             <Stack.Screen
                 options={{
                     title: getChatName(),
+                    headerTransparent: true,
+                    headerBackgroundContainerStyle: {
+                        backgroundColor: `${backgroundColor}CC`,  // CC는 80% 투명도
+                        borderBottomWidth: 0,
+                    },
+                    headerStyle: {
+                        backgroundColor: 'transparent',
+                    },
+                    headerTitleStyle: {
+                        fontSize: 17,
+                        fontWeight: '600',
+                    },
                     headerLeft: () => (
-                        <IconButton icon="arrow-left" onPress={() => router.back()} />
+                        <IconButton
+                            icon="arrow-left"
+                            size={22}
+                            iconColor="#000"
+                            onPress={() => router.back()}
+                            style={{ marginLeft: -5 }}
+                        />
                     ),
                     headerRight: () => (
-                        <Menu
-                            visible={menuVisible}
-                            onDismiss={() => setMenuVisible(false)}
-                            anchor={
-                                <IconButton
-                                    icon="dots-vertical"
-                                    onPress={() => setMenuVisible(true)}
-                                />
-                            }
-                        >
-                            {chatRoom.isGroup && (
-                                <Menu.Item
-                                    title="그룹 이름 변경"
-                                    leadingIcon="pencil"
-                                    onPress={() => {
-                                        setNewGroupName(chatRoom.name);
-                                        setRenamingGroup(true);
-                                        setMenuVisible(false);
-                                    }}
-                                />
-                            )}
-                            <Menu.Item
-                                title="배경색 변경"
-                                leadingIcon="palette"
-                                onPress={() => {
-                                    setCurrentColor(chatRoom.backgroundColor || '#F9FAFB');
-                                    setColorPickerVisible(true);
-                                    setMenuVisible(false);
-                                }}
-                            />
-                        </Menu>
-                    )
+                        <View style={styles.headerRight}>
+                            <IconButton icon="magnify" size={22} iconColor="#000" style={{ margin: 0 }} />
+                            <IconButton icon="menu" size={22} iconColor="#000" style={{ margin: 0 }} />
+                        </View>
+                    ),
                 }}
             />
-            <ThemedView style={[styles.container, { backgroundColor: chatRoom.backgroundColor || '#F9FAFB' }]}>
+
+            <View style={[styles.container, { backgroundColor, paddingTop: 40 }]}>
                 <FlatList
                     ref={flatListRef}
                     data={chatMessages}
                     keyExtractor={item => item.id}
                     contentContainerStyle={styles.messageList}
-                    onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                    onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+                    onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
                     renderItem={({ item, index }) => {
                         const isUser = item.senderId === user.id;
-                        const showSender =
-                            chatRoom.isGroup &&
-                            item.senderId !== user.id &&
-                            (index === 0 || chatMessages[index - 1].senderId !== item.senderId);
+                        const sameGroup = isSameGroup(index);
+                        const showSenderName = !isUser && !sameGroup;
+                        const showTime = !sameGroup || index === chatMessages.length - 1;
+                        const showAvatar = !isUser && !sameGroup;
 
                         return (
                             <View style={[
                                 styles.messageContainer,
-                                isUser ? styles.userMessageContainer : styles.otherMessageContainer
+                                isUser ? styles.userMessageContainer : styles.otherMessageContainer,
+                                sameGroup && styles.groupedMessage
                             ]}>
-                                {showSender && (
-                                    <ThemedText style={styles.senderName}>{getSenderName(item.senderId)}</ThemedText>
+                                {showSenderName && (
+                                    <ThemedText style={styles.senderName}>
+                                        {friends.find(f => f.id === item.senderId)?.name || '알 수 없음'}
+                                    </ThemedText>
                                 )}
 
-                                <View style={[
-                                    styles.messageBubble,
-                                    isUser ? styles.userBubble : styles.otherBubble
-                                ]}>
-                                    <ThemedText>{item.text}</ThemedText>
-                                </View>
+                                <View style={styles.messageRow}>
+                                    {!isUser && (
+                                        showAvatar ? (
+                                            <Avatar.Image
+                                                source={{ uri: getProfileImage(item.senderId) }}
+                                                size={36}
+                                                style={styles.avatar}
+                                            />
+                                        ) : (
+                                            <View style={styles.avatarPlaceholder} />
+                                        )
+                                    )}
 
-                                <ThemedText style={styles.messageTime}>{formatTime(item.createdAt)}</ThemedText>
+                                    <View style={[
+                                        styles.messageBubble,
+                                        isUser ? styles.userBubble : styles.otherBubble
+                                    ]}>
+                                        <ThemedText style={isUser ? styles.userMessageText : styles.otherMessageText}>
+                                            {item.text}
+                                        </ThemedText>
+                                    </View>
+
+                                    {showTime && (
+                                        <ThemedText style={[
+                                            styles.messageTime,
+                                            isUser ? styles.userMessageTime : styles.otherMessageTime
+                                        ]}>
+                                            {formatTime(item.createdAt)}
+                                        </ThemedText>
+                                    )}
+                                </View>
                             </View>
                         );
                     }}
                 />
+            </View>
 
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    keyboardVerticalOffset={100}
-                    style={[styles.inputContainer, { marginBottom: insets.bottom }]}
-                >
-                    <TextInput
-                        ref={messageInputRef}
-                        mode="outlined"
-                        value={messageText}
-                        onChangeText={setMessageText}
-                        placeholder="메시지 입력..."
-                        right={
-                            <TextInput.Icon
-                                icon="send"
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
+                style={styles.inputContainer}
+            >
+                <View style={styles.inputWrapperOuter}>
+                    <View style={styles.inputWrapper}>
+                        <TouchableOpacity style={styles.plusButton}>
+                            <IconButton icon="plus" size={26} iconColor="#333" style={{ margin: 0 }} />
+                        </TouchableOpacity>
+
+                        <RNTextInput
+                            ref={messageInputRef}
+                            value={messageText}
+                            onChangeText={setMessageText}
+                            placeholder="메시지 입력..."
+                            style={styles.input}
+                            multiline
+                            placeholderTextColor="#aaa"
+                        />
+
+                        {messageText.trim() !== '' ? (
+                            <TouchableOpacity
+                                style={styles.sendButton}
                                 onPress={handleSendMessage}
-                                disabled={messageText.trim() === ''}
-                            />
-                        }
-                        style={styles.input}
-                    />
-                </KeyboardAvoidingView>
-
-                <Portal>
-                    <Modal
-                        visible={renamingGroup}
-                        onDismiss={() => setRenamingGroup(false)}
-                        contentContainerStyle={styles.modalContent}
-                    >
-                        <ThemedView style={styles.modalContainer}>
-                            <ThemedText type="subtitle">그룹 이름 변경</ThemedText>
-                            <TextInput
-                                mode="outlined"
-                                label="새 그룹 이름"
-                                value={newGroupName}
-                                onChangeText={setNewGroupName}
-                                style={styles.modalInput}
-                            />
-                            <View style={styles.modalButtons}>
-                                <Button
-                                    mode="outlined"
-                                    onPress={() => setRenamingGroup(false)}
-                                    style={styles.modalButton}
-                                >
-                                    취소
-                                </Button>
-                                <Button
-                                    mode="contained"
-                                    onPress={handleRenameGroup}
-                                    style={styles.modalButton}
-                                    disabled={newGroupName.trim() === ''}
-                                >
-                                    변경
-                                </Button>
+                            >
+                                <ThemedText style={styles.sendButtonText}>전송</ThemedText>
+                            </TouchableOpacity>
+                        ) : (
+                            <View style={styles.inputButtons}>
+                                <IconButton icon="emoticon" size={26} iconColor="#333" style={styles.inputButton} />
+                                <IconButton icon="pound" size={26} iconColor="#333" style={styles.inputButton} />
                             </View>
-                        </ThemedView>
-                    </Modal>
-
-                    <Modal
-                        visible={colorPickerVisible}
-                        onDismiss={() => setColorPickerVisible(false)}
-                        contentContainerStyle={styles.modalContent}
-                    >
-                        <ThemedView style={styles.colorPickerContainer}>
-                            <ThemedText type="subtitle" style={styles.colorPickerTitle}>
-                                배경 색상 선택
-                            </ThemedText>
-                            <View style={styles.colorPicker}>
-                                <ColorPicker
-                                    color={currentColor}
-                                    onColorChangeComplete={setCurrentColor}
-                                    thumbSize={30}
-                                    sliderSize={20}
-                                    noSnap={true}
-                                    row={false}
-                                />
-                            </View>
-                            <View style={styles.modalButtons}>
-                                <Button
-                                    mode="outlined"
-                                    onPress={() => setColorPickerVisible(false)}
-                                    style={styles.modalButton}
-                                >
-                                    취소
-                                </Button>
-                                <Button
-                                    mode="contained"
-                                    onPress={handleColorComplete}
-                                    style={styles.modalButton}
-                                >
-                                    확인
-                                </Button>
-                            </View>
-                        </ThemedView>
-                    </Modal>
-                </Portal>
-            </ThemedView>
-        </>
+                        )}
+                    </View>
+                </View>
+            </KeyboardAvoidingView>
+        </View>
     );
 }
 
@@ -284,87 +236,129 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
+    headerRight: {
+        flexDirection: 'row',
+    },
     messageList: {
-        padding: 16,
-        paddingBottom: 80,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
     },
     messageContainer: {
-        marginBottom: 12,
-        maxWidth: '80%',
+        marginBottom: 4,
+        maxWidth: '75%',
     },
     userMessageContainer: {
         alignSelf: 'flex-end',
+        marginRight: 5,
     },
     otherMessageContainer: {
         alignSelf: 'flex-start',
+        marginLeft: 5,
+    },
+    groupedMessage: {
+        marginBottom: 1,
     },
     senderName: {
         fontSize: 12,
-        marginBottom: 2,
         color: '#666',
+        marginBottom: 3,
+        marginLeft: 44, // 아바타 이미지 크기 + 여백
+    },
+    messageRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+    },
+    avatar: {
+        marginRight: 6,
+    },
+    avatarPlaceholder: {
+        width: 36,
+        marginRight: 6,
     },
     messageBubble: {
-        padding: 12,
-        borderRadius: 20,
-        minWidth: 60,
+        padding: 9,
+        borderRadius: 13,
+        maxWidth: '80%',
     },
     userBubble: {
-        backgroundColor: '#DCF8C6',
-        borderBottomRightRadius: 0,
+        backgroundColor: '#FEE500', // 카카오톡 노란색
+        borderTopRightRadius: 3,
     },
     otherBubble: {
-        backgroundColor: 'white',
-        borderBottomLeftRadius: 0,
+        backgroundColor: '#FFFFFF',
+        borderTopLeftRadius: 3,
+    },
+    userMessageText: {
+        color: '#000',
+        fontSize: 15,
+    },
+    otherMessageText: {
+        color: '#000',
+        fontSize: 15,
     },
     messageTime: {
-        fontSize: 10,
-        color: '#666',
-        marginTop: 2,
+        fontSize: 11,
+        color: '#888',
         alignSelf: 'flex-end',
+        marginHorizontal: 4,
+    },
+    userMessageTime: {
+        marginRight: 2,
+    },
+    otherMessageTime: {
+        marginLeft: 2,
     },
     inputContainer: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        padding: 8,
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-        borderTopWidth: 1,
-        borderTopColor: '#e0e0e0',
+        backgroundColor: 'white',
+        borderTopWidth: 0.5,
+        borderTopColor: '#d8d8d8',
     },
-    input: {
+    inputWrapperOuter: {
         backgroundColor: 'white',
     },
-    modalContent: {
+    inputWrapper: {
+        flexDirection: 'row',
         alignItems: 'center',
+        paddingHorizontal: 5,
+        paddingVertical: 8,
+        paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+        backgroundColor: 'white',
+    },
+    plusButton: {
+        marginHorizontal: 2,
+    },
+    input: {
+        flex: 1,
+        maxHeight: 100,
+        backgroundColor: '#f5f5f5',
+        borderRadius: 20,
+        paddingHorizontal: 12,
+        paddingTop: 8,
+        paddingBottom: 8,
+        marginHorizontal: 8,
+        fontSize: 16,
+    },
+    sendButton: {
+        backgroundColor: '#FEE500',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 18,
+        marginHorizontal: 6,
         justifyContent: 'center',
     },
-    modalContainer: {
-        width: '80%',
-        padding: 20,
-        borderRadius: 10,
+    sendButtonText: {
+        color: '#000',
+        fontWeight: '500',
     },
-    modalInput: {
-        marginTop: 16,
-    },
-    modalButtons: {
+    inputButtons: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginTop: 20,
+        marginRight: 4,
     },
-    modalButton: {
-        width: '40%',
-    },
-    colorPickerContainer: {
-        width: '80%',
-        padding: 20,
-        borderRadius: 10,
-    },
-    colorPickerTitle: {
-        textAlign: 'center',
-        marginBottom: 20,
-    },
-    colorPicker: {
-        height: 300,
+    inputButton: {
+        margin: 0,
     },
 });

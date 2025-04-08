@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Avatar, Badge, Divider, FAB, Portal, Dialog, TextInput, Button } from 'react-native-paper';
+import { FlatList, StyleSheet, TouchableOpacity, View, StatusBar } from 'react-native';
+import { Avatar, Divider, IconButton } from 'react-native-paper';
 import { router } from 'expo-router';
 import { ThemedText } from '@/src/components/ThemedText';
 import { ThemedView } from '@/src/components/ThemedView';
@@ -10,14 +10,10 @@ import { useFriendsStore } from '@/src/stores/friendsStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ChatScreen() {
-    const { chatRooms, messages, createChatRoom } = useChatStore();
+    const { chatRooms, messages } = useChatStore();
     const { user } = useUserStore();
     const { friends } = useFriendsStore();
     const insets = useSafeAreaInsets();
-
-    const [createDialogVisible, setCreateDialogVisible] = useState(false);
-    const [newGroupName, setNewGroupName] = useState('');
-    const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
 
     // 채팅방 정렬: 마지막 메시지 시간 기준으로 내림차순
     const sortedChatRooms = [...chatRooms].sort((a, b) => {
@@ -61,122 +57,118 @@ export default function ChatScreen() {
         return lastMsg.text;
     };
 
-    // 그룹 채팅방 생성
-    const handleCreateGroupChat = () => {
-        if (selectedFriends.length === 0 || !user) {
-            setCreateDialogVisible(false);
-            return;
+    // 시간 포맷팅
+    const formatTime = (timestamp: number) => {
+        const now = new Date();
+        const msgDate = new Date(timestamp);
+
+        // 오늘 메시지인 경우 시간만 표시
+        if (msgDate.getDate() === now.getDate() &&
+            msgDate.getMonth() === now.getMonth() &&
+            msgDate.getFullYear() === now.getFullYear()) {
+
+            const hours = msgDate.getHours();
+            const minutes = msgDate.getMinutes();
+            const ampm = hours >= 12 ? '오후' : '오전';
+            const formattedHours = hours % 12 === 0 ? 12 : hours % 12;
+            const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
+
+            return `${ampm} ${formattedHours}:${formattedMinutes}`;
         }
 
-        // 채팅방 생성
-        const chatId = createChatRoom({
-            name: newGroupName || '새 그룹 채팅',
-            participants: [user.id, ...selectedFriends],
-            isGroup: true
-        });
-
-        // 초기화 및 채팅방으로 이동
-        setCreateDialogVisible(false);
-        setNewGroupName('');
-        setSelectedFriends([]);
-        router.push(`/chat/${chatId}`);
-    };
-
-    // 친구 선택 토글
-    const toggleFriendSelection = (friendId: string) => {
-        if (selectedFriends.includes(friendId)) {
-            setSelectedFriends(prev => prev.filter(id => id !== friendId));
-        } else {
-            setSelectedFriends(prev => [...prev, friendId]);
+        // 어제 메시지인 경우
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        if (msgDate.getDate() === yesterday.getDate() &&
+            msgDate.getMonth() === yesterday.getMonth() &&
+            msgDate.getFullYear() === yesterday.getFullYear()) {
+            return '어제';
         }
+
+        // 그 외의 경우 날짜 표시
+        return `${msgDate.getMonth() + 1}월 ${msgDate.getDate()}일`;
     };
 
     return (
         <ThemedView style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+
+            {/* 헤더 */}
             <View style={[styles.header, { marginTop: insets.top }]}>
-                <ThemedText type="title">채팅</ThemedText>
+                <ThemedText type="title" style={styles.title}>채팅</ThemedText>
+                <View style={styles.headerIcons}>
+                    <IconButton
+                        icon="magnify"
+                        size={24}
+                        onPress={() => {}}
+                        style={styles.iconButton}
+                    />
+                    <IconButton
+                        icon="plus"
+                        size={24}
+                        onPress={() => {}}
+                        style={styles.iconButton}
+                    />
+                    <IconButton
+                        icon="cog"
+                        size={24}
+                        onPress={() => {}}
+                        style={styles.iconButton}
+                    />
+                </View>
             </View>
 
             <FlatList
                 data={sortedChatRooms}
                 keyExtractor={item => item.id}
-                ItemSeparatorComponent={() => <Divider />}
-                renderItem={({ item }) => (
-                    <TouchableOpacity
-                        style={styles.chatItem}
-                        onPress={() => router.push(`/chat/${item.id}`)}
-                    >
-                        <View style={styles.chatItemContent}>
-                            <Avatar.Text
-                                size={50}
-                                label={getParticipantNames(item).substring(0, 2)}
-                            />
-                            <View style={styles.chatInfo}>
-                                <ThemedText type="defaultSemiBold">{getParticipantNames(item)}</ThemedText>
-                                <ThemedText numberOfLines={1} style={styles.lastMessage}>
-                                    {formatLastMessage(item.id)}
-                                </ThemedText>
-                            </View>
-                        </View>
+                ItemSeparatorComponent={() => <Divider style={styles.divider} />}
+                renderItem={({ item }) => {
+                    const chatName = getParticipantNames(item);
+                    const lastMessage = formatLastMessage(item.id);
+                    const unreadCount = getUnreadCount(item.id);
+                    const lastTime = formatTime(item.lastMessage?.createdAt || item.createdAt);
 
-                        {getUnreadCount(item.id) > 0 && (
-                            <Badge style={styles.badge}>{getUnreadCount(item.id)}</Badge>
-                        )}
-                    </TouchableOpacity>
-                )}
-            />
+                    // 프로필 이미지 결정 (1:1 채팅은 상대방 이미지, 그룹은 이니셜)
+                    const isOneOnOne = !item.isGroup;
+                    const otherParticipantId = isOneOnOne ? item.participants.find(id => id !== user?.id) : null;
+                    const otherUser = otherParticipantId ? friends.find(f => f.id === otherParticipantId) : null;
+                    const profileUri = otherUser?.avatar;
 
-            <FAB
-                icon="plus"
-                style={[styles.fab, { bottom: insets.bottom + 16 }]}
-                onPress={() => setCreateDialogVisible(true)}
-            />
-
-            <Portal>
-                <Dialog
-                    visible={createDialogVisible}
-                    onDismiss={() => setCreateDialogVisible(false)}
-                    style={styles.dialog}
-                >
-                    <Dialog.Title>새 그룹 채팅 만들기</Dialog.Title>
-                    <Dialog.Content>
-                        <TextInput
-                            label="그룹 이름"
-                            value={newGroupName}
-                            onChangeText={setNewGroupName}
-                            style={styles.input}
-                        />
-
-                        <ThemedText type="defaultSemiBold" style={styles.friendsTitle}>친구 선택</ThemedText>
-                        <FlatList
-                            data={friends}
-                            keyExtractor={item => item.id}
-                            style={styles.friendsList}
-                            renderItem={({ item }) => (
-                                <TouchableOpacity
-                                    style={[
-                                        styles.friendItem,
-                                        selectedFriends.includes(item.id) && styles.selectedFriend
-                                    ]}
-                                    onPress={() => toggleFriendSelection(item.id)}
-                                >
-                                    <Avatar.Image source={{ uri: item.avatar }} size={40} />
-                                    <ThemedText style={styles.friendName}>{item.name}</ThemedText>
-                                </TouchableOpacity>
-                            )}
-                        />
-                    </Dialog.Content>
-                    <Dialog.Actions>
-                        <Button onPress={() => setCreateDialogVisible(false)}>취소</Button>
-                        <Button
-                            onPress={handleCreateGroupChat}
-                            disabled={selectedFriends.length === 0}
+                    return (
+                        <TouchableOpacity
+                            style={styles.chatItem}
+                            onPress={() => router.push(`/chat/${item.id}`)}
                         >
-                            생성
-                        </Button>
-                    </Dialog.Actions>
-                </Dialog>
-            </Portal>
+                            <View style={styles.chatItemLeft}>
+                                {isOneOnOne && profileUri ? (
+                                    <Avatar.Image source={{ uri: profileUri }} size={50} />
+                                ) : (
+                                    <Avatar.Text size={50} label={chatName.substring(0, 2)} />
+                                )}
+                            </View>
+
+                            <View style={styles.chatItemContent}>
+                                <View style={styles.chatItemHeader}>
+                                    <ThemedText numberOfLines={1} style={styles.chatName}>{chatName}</ThemedText>
+                                    <ThemedText style={styles.timeText}>{lastTime}</ThemedText>
+                                </View>
+
+                                <View style={styles.chatItemFooter}>
+                                    <ThemedText numberOfLines={1} style={styles.lastMessage}>
+                                        {lastMessage}
+                                    </ThemedText>
+
+                                    {unreadCount > 0 && (
+                                        <View style={styles.unreadBadge}>
+                                            <ThemedText style={styles.unreadText}>{unreadCount}</ThemedText>
+                                        </View>
+                                    )}
+                                </View>
+                            </View>
+                        </TouchableOpacity>
+                    );
+                }}
+            />
         </ThemedView>
     );
 }
@@ -184,59 +176,81 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#ffffff',
     },
     header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         paddingHorizontal: 16,
         paddingVertical: 8,
+        backgroundColor: '#ffffff',
+    },
+    title: {
+        fontSize: 24,
+        fontWeight: 'bold',
+    },
+    headerIcons: {
+        flexDirection: 'row',
+    },
+    iconButton: {
+        margin: 0,
+    },
+    divider: {
+        height: 0.5,
+        backgroundColor: '#eeeeee',
     },
     chatItem: {
         flexDirection: 'row',
         padding: 16,
+        backgroundColor: '#ffffff',
+    },
+    chatItemLeft: {
+        marginRight: 12,
+    },
+    chatItemContent: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    chatItemHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    chatName: {
+        fontSize: 16,
+        fontWeight: '500',
+        flex: 1,
+    },
+    timeText: {
+        fontSize: 12,
+        color: '#888',
+        marginLeft: 8,
+    },
+    chatItemFooter: {
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
     },
-    chatItemContent: {
-        flexDirection: 'row',
-        flex: 1,
-    },
-    chatInfo: {
-        marginLeft: 16,
-        flex: 1,
-    },
     lastMessage: {
-        color: '#666',
         fontSize: 14,
-        marginTop: 4,
+        color: '#666',
+        flex: 1,
     },
-    badge: {
-        backgroundColor: '#4F46E5',
-    },
-    fab: {
-        position: 'absolute',
-        right: 16,
-    },
-    dialog: {
-        maxHeight: '80%',
-    },
-    input: {
-        marginBottom: 16,
-    },
-    friendsTitle: {
-        marginVertical: 8,
-    },
-    friendsList: {
-        maxHeight: 300,
-    },
-    friendItem: {
-        flexDirection: 'row',
+    unreadBadge: {
+        backgroundColor: '#F23C3C',
+        borderRadius: 15,
+        minWidth: 22,
+        height: 22,
         alignItems: 'center',
-        padding: 8,
-        borderRadius: 8,
+        justifyContent: 'center',
+        marginLeft: 8,
+        paddingHorizontal: 6,
     },
-    selectedFriend: {
-        backgroundColor: 'rgba(79, 70, 229, 0.1)',
-    },
-    friendName: {
-        marginLeft: 12,
+    unreadText: {
+        color: 'white',
+        fontSize: 12,
+        fontWeight: 'bold',
     },
 });

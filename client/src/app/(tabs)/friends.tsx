@@ -1,20 +1,25 @@
 import React, { useState } from 'react';
-import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { Avatar, Button, FAB, IconButton, Menu, Searchbar, Portal, Modal } from 'react-native-paper';
+import { FlatList, StyleSheet, TouchableOpacity, View, StatusBar } from 'react-native';
+import { Avatar, Divider, IconButton, Searchbar } from 'react-native-paper';
 import { router } from 'expo-router';
-import ColorPicker from 'react-native-wheel-color-picker';
 import { ThemedText } from '@/src/components/ThemedText';
 import { ThemedView } from '@/src/components/ThemedView';
 import { useFriendsStore } from '@/src/stores/friendsStore';
+import {User, useUserStore} from '@/src/stores/userStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {Friend} from "@/src/types/models";
+
+type FriendsListItem =
+    | { type: 'myProfile', data: User | null }
+    | { type: 'divider' }
+    | { type: 'friend', data: Friend };
 
 export default function FriendsScreen() {
-    const { friends, backgroundColor, setBackgroundColor } = useFriendsStore();
+    const { friends } = useFriendsStore();
+    const { user } = useUserStore();
+    const [isSearchVisible, setIsSearchVisible] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [colorPickerVisible, setColorPickerVisible] = useState(false);
-    const [currentColor, setCurrentColor] = useState(backgroundColor);
     const insets = useSafeAreaInsets();
-    const [menuVisible, setMenuVisible] = useState(false);
 
     // 친구 검색 기능
     const filteredFriends = friends.filter(friend =>
@@ -22,120 +27,107 @@ export default function FriendsScreen() {
         friend.statusMessage.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    // 색상 선택 완료 처리
-    const handleColorComplete = () => {
-        setBackgroundColor(currentColor);
-        setColorPickerVisible(false);
+    const toggleSearch = () => {
+        setIsSearchVisible(!isSearchVisible);
+        if (isSearchVisible) setSearchQuery('');
     };
 
     return (
-        <ThemedView style={[styles.container, { backgroundColor }]}>
+        <ThemedView style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#f6f6f6" />
+
+            {/* 헤더 */}
             <View style={[styles.header, { marginTop: insets.top }]}>
                 <ThemedText type="title" style={styles.title}>친구</ThemedText>
-                <View style={styles.headerRight}>
+                <View style={styles.headerIcons}>
                     <IconButton
-                        icon="palette"
+                        icon="magnify"
                         size={24}
-                        onPress={() => setColorPickerVisible(true)}
-                        style={styles.actionButton}
+                        onPress={toggleSearch}
+                        style={styles.iconButton}
                     />
-                    <Menu
-                        visible={menuVisible}
-                        onDismiss={() => setMenuVisible(false)}
-                        anchor={
-                            <IconButton
-                                icon="dots-vertical"
-                                size={24}
-                                onPress={() => setMenuVisible(true)}
-                                style={styles.actionButton}
-                            />
-                        }
-                    >
-                        <Menu.Item
-                            title="친구 추가"
-                            leadingIcon="account-plus"
-                            onPress={() => {
-                                setMenuVisible(false);
-                                router.push('/friend-add');
-                            }}
-                        />
-                    </Menu>
+                    <IconButton
+                        icon="account-plus"
+                        size={24}
+                        onPress={() => router.push('/friend-add')}
+                        style={styles.iconButton}
+                    />
+                    <IconButton
+                        icon="cog"
+                        size={24}
+                        onPress={() => {}}
+                        style={styles.iconButton}
+                    />
                 </View>
             </View>
 
-            <Searchbar
-                placeholder="이름 또는 상태메시지로 검색"
-                onChangeText={setSearchQuery}
-                value={searchQuery}
-                style={styles.searchBar}
-            />
+            {/* 검색바 */}
+            {isSearchVisible && (
+                <Searchbar
+                    placeholder="이름 또는 상태메시지로 검색"
+                    onChangeText={setSearchQuery}
+                    value={searchQuery}
+                    style={styles.searchBar}
+                    inputStyle={styles.searchInput}
+                    iconColor="#aaa"
+                />
+            )}
 
             <FlatList
-                data={filteredFriends}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.list}
-                renderItem={({ item }) => (
-                    <TouchableOpacity
-                        style={styles.friendItem}
-                        onPress={() => router.push(`/friend-detail/${item.id}`)}
-                    >
-                        <Avatar.Image
-                            source={{ uri: item.avatar }}
-                            size={50}
-                        />
-                        <View style={styles.friendInfo}>
-                            <ThemedText type="defaultSemiBold">{item.name}</ThemedText>
-                            <ThemedText>{item.statusMessage}</ThemedText>
-                        </View>
-                    </TouchableOpacity>
-                )}
-            />
+                data={[
+                    { type: 'myProfile', data: user } as FriendsListItem,
+                    { type: 'divider' } as FriendsListItem,
+                    ...filteredFriends.map(friend => ({ type: 'friend', data: friend } as FriendsListItem))
+                ]}
+                keyExtractor={(item: FriendsListItem, index) => {
+                    if (item.type === 'divider') return `divider-${index}`;
+                    if (item.type === 'myProfile') return 'my-profile';
+                    return item.type === 'friend' ? item.data.id : `unknown-${index}`;
+                }}
+                renderItem={({ item }: { item: FriendsListItem }) => {
+                    if (item.type === 'divider') {
+                        return <Divider style={styles.divider} />;
+                    }
 
-            <FAB
-                icon="account-plus"
-                style={[styles.fab, { bottom: insets.bottom + 16 }]}
-                onPress={() => router.push('/friend-add')}
-            />
+                    if (item.type === 'myProfile' && user) {
+                        return (
+                            <TouchableOpacity
+                                style={styles.myProfileItem}
+                                onPress={() => router.push('/profile')}
+                            >
+                                <Avatar.Image
+                                    source={{ uri: user.avatar }}
+                                    size={60}
+                                />
+                                <View style={styles.profileInfo}>
+                                    <ThemedText style={styles.myName}>{user.name}</ThemedText>
+                                    <ThemedText style={styles.statusMessage}>{user.statusMessage}</ThemedText>
+                                </View>
+                            </TouchableOpacity>
+                        );
+                    }
 
-            <Portal>
-                <Modal
-                    visible={colorPickerVisible}
-                    onDismiss={() => setColorPickerVisible(false)}
-                    contentContainerStyle={styles.colorPickerModal}
-                >
-                    <ThemedView style={styles.colorPickerContainer}>
-                        <ThemedText type="subtitle" style={styles.colorPickerTitle}>
-                            배경 색상 선택
-                        </ThemedText>
-                        <View style={styles.colorPicker}>
-                            <ColorPicker
-                                color={currentColor}
-                                onColorChangeComplete={setCurrentColor}
-                                thumbSize={30}
-                                sliderSize={20}
-                                noSnap={true}
-                                row={false}
-                            />
-                        </View>
-                        <View style={styles.colorPickerButtons}>
-                            <Button
-                                mode="outlined"
-                                onPress={() => setColorPickerVisible(false)}
-                                style={styles.colorPickerButton}
+                    if (item.type === 'friend') {
+                        return (
+                            <TouchableOpacity
+                                style={styles.friendItem}
+                                onPress={() => router.push(`/friend-detail/${item.data.id}`)}
                             >
-                                취소
-                            </Button>
-                            <Button
-                                mode="contained"
-                                onPress={handleColorComplete}
-                                style={styles.colorPickerButton}
-                            >
-                                확인
-                            </Button>
-                        </View>
-                    </ThemedView>
-                </Modal>
-            </Portal>
+                                <Avatar.Image
+                                    source={{ uri: item.data.avatar }}
+                                    size={50}
+                                />
+                                <View style={styles.friendInfo}>
+                                    <ThemedText style={styles.friendName}>{item.data.name}</ThemedText>
+                                    <ThemedText style={styles.statusMessage}>{item.data.statusMessage}</ThemedText>
+                                </View>
+                            </TouchableOpacity>
+                        );
+                    }
+
+                    return null;
+                }}
+            />
         </ThemedView>
     );
 }
@@ -143,6 +135,7 @@ export default function FriendsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#f6f6f6',
     },
     header: {
         flexDirection: 'row',
@@ -152,59 +145,62 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
     },
     title: {
-        fontSize: 28,
+        fontSize: 24,
+        fontWeight: 'bold',
     },
-    headerRight: {
+    headerIcons: {
         flexDirection: 'row',
     },
-    actionButton: {
-        marginLeft: 8,
+    iconButton: {
+        margin: 0,
     },
     searchBar: {
         marginHorizontal: 16,
-        marginVertical: 8,
+        marginBottom: 8,
         elevation: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        backgroundColor: '#eeeeee',
+        borderRadius: 20,
+        height: 40,
     },
-    list: {
-        paddingHorizontal: 16,
+    searchInput: {
+        fontSize: 14,
+    },
+    myProfileItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        backgroundColor: '#f6f6f6',
+    },
+    profileInfo: {
+        marginLeft: 16,
+        justifyContent: 'center',
+    },
+    myName: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginBottom: 2,
+    },
+    divider: {
+        height: 0.5,
+        backgroundColor: '#dddddd',
     },
     friendItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+        padding: 12,
+        paddingHorizontal: 16,
+        backgroundColor: '#f6f6f6',
     },
     friendInfo: {
         marginLeft: 16,
     },
-    fab: {
-        position: 'absolute',
-        right: 16,
+    friendName: {
+        fontSize: 16,
+        fontWeight: '500',
+        marginBottom: 2,
     },
-    colorPickerModal: {
-        alignItems: 'center',
-        justifyContent: 'center',
+    statusMessage: {
+        fontSize: 13,
+        color: '#888',
     },
-    colorPickerContainer: {
-        width: '80%',
-        padding: 20,
-        borderRadius: 10,
-    },
-    colorPickerTitle: {
-        textAlign: 'center',
-        marginBottom: 20,
-    },
-    colorPicker: {
-        height: 300,
-    },
-    colorPickerButtons: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginTop: 20,
-    },
-    colorPickerButton: {
-        width: '40%',
-    }
 });
