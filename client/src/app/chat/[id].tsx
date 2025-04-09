@@ -45,6 +45,13 @@ export default function ChatDetailScreen() {
         }
     }, []);
 
+    // 채팅방 진입 시 또는 메시지가 변경될 때 항상 스크롤을 최하단으로 이동
+    useEffect(() => {
+        if (chatMessages.length > 0 && flatListRef.current) {
+            flatListRef.current.scrollToEnd({ animated: false });
+        }
+    }, [chatMessages, id]);
+
     // 키보드 이벤트 감지
     useEffect(() => {
         const keyboardDidShowListener = Keyboard.addListener(
@@ -236,8 +243,24 @@ export default function ChatDetailScreen() {
                             styles.messageList,
                             { paddingTop: headerHeight + 8, paddingBottom: 70 + insets.bottom }
                         ]}
-                        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-                        onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+                        // 스크롤 성능 최적화 옵션 추가
+                        removeClippedSubviews={false}
+                        // 콘텐츠 크기가 변경될 때 항상 스크롤을 아래로
+                        onContentSizeChange={() => {
+                            if (chatMessages.length > 0) {
+                                setTimeout(() => {
+                                    flatListRef.current?.scrollToEnd({ animated: false });
+                                }, 50);
+                            }
+                        }}
+                        // 레이아웃이 변경될 때 항상 스크롤을 아래로
+                        onLayout={() => {
+                            if (chatMessages.length > 0) {
+                                setTimeout(() => {
+                                    flatListRef.current?.scrollToEnd({ animated: false });
+                                }, 50);
+                            }
+                        }}
                         renderItem={({ item, index }) => {
                             const isUser = item.senderId === user.id;
                             const sameGroup = isSameGroup(index);
