@@ -26,6 +26,7 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="myapp"/>
         <data android:scheme="com.chat.client"/>
+        <data android:scheme="exp+client"/>
       </intent-filter>
     </activity>
   </application>
