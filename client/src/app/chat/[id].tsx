@@ -229,6 +229,7 @@ export default function ChatDetailScreen() {
                                     )}
 
                                     <View style={styles.messageRow}>
+                                        {/* 타인 아바타 표시 */}
                                         {!isUser && (
                                             showAvatar ? (
                                                 <Avatar.Image
@@ -241,6 +242,14 @@ export default function ChatDetailScreen() {
                                             )
                                         )}
 
+                                        {/* 사용자 메시지일 경우 시간을 먼저 표시 */}
+                                        {isUser && showTime && (
+                                            <ThemedText style={[styles.messageTime, styles.userMessageTime]}>
+                                                {formatTime(item.createdAt)}
+                                            </ThemedText>
+                                        )}
+
+                                        {/* 메시지 버블 */}
                                         <View style={[
                                             styles.messageBubble,
                                             isUser ? styles.userBubble : styles.otherBubble
@@ -250,11 +259,9 @@ export default function ChatDetailScreen() {
                                             </ThemedText>
                                         </View>
 
-                                        {showTime && (
-                                            <ThemedText style={[
-                                                styles.messageTime,
-                                                isUser ? styles.userMessageTime : styles.otherMessageTime
-                                            ]}>
+                                        {/* 타인 메시지일 경우 시간을 나중에 표시 */}
+                                        {!isUser && showTime && (
+                                            <ThemedText style={[styles.messageTime, styles.otherMessageTime]}>
                                                 {formatTime(item.createdAt)}
                                             </ThemedText>
                                         )}
@@ -377,8 +384,8 @@ const styles = StyleSheet.create({
     messageBubble: {
         padding: 9,
         borderRadius: 13,
-        minWidth: 40, // 최소 너비 추가
-        maxWidth: '100%', // 컨테이너 내에서 최대 너비 사용
+        minWidth: 40,
+        maxWidth: '100%',
     },
     userBubble: {
         backgroundColor: '#FEE500',
@@ -400,13 +407,12 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#888',
         alignSelf: 'flex-end',
-        marginHorizontal: 4,
     },
     userMessageTime: {
-        marginRight: 2,
+        marginRight: 4,
     },
     otherMessageTime: {
-        marginLeft: 2,
+        marginLeft: 4,
     },
     inputContainer: {
         backgroundColor: 'white',
