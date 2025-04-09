@@ -10,14 +10,14 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.chat-app.client"
+      "bundleIdentifier": "com.chat.client"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.chat-app.client"
+      "package": "com.chat.client"
     },
     "web": {
       "bundler": "metro",
