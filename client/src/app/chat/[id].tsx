@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TextInput as RNTextInput, TouchableOpacity, StatusBar, Dimensions } from 'react-native';
+import {
+    View, StyleSheet, FlatList, Platform, TextInput as RNTextInput,
+    TouchableOpacity, StatusBar, Keyboard, KeyboardEvent
+} from 'react-native';
 import { IconButton, Avatar } from 'react-native-paper';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/src/components/ThemedText';
@@ -20,8 +23,46 @@ export default function ChatDetailScreen() {
     const chatMessages = messages[id] || [];
 
     const [messageText, setMessageText] = useState('');
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
+    const [keyboardVisible, setKeyboardVisible] = useState(false);
+
     const messageInputRef = useRef<RNTextInput>(null);
     const flatListRef = useRef<FlatList>(null);
+
+    // 키보드 이벤트 처리기
+    useEffect(() => {
+        // iOS에서는 키보드가 나타나기 전에 미리 준비(willShow)
+        // Android에서는 키보드가 나타난 후(didShow)
+        const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+        const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+        const keyboardWillShowListener = Keyboard.addListener(
+            showEvent,
+            (e: KeyboardEvent) => {
+                // 키보드의 정확한 높이 값을 저장
+                setKeyboardHeight(e.endCoordinates.height);
+                setKeyboardVisible(true);
+
+                // 키보드가 올라오면 스크롤을 맨 아래로
+                setTimeout(() => {
+                    flatListRef.current?.scrollToEnd({ animated: false });
+                }, 50);
+            }
+        );
+
+        const keyboardWillHideListener = Keyboard.addListener(
+            hideEvent,
+            () => {
+                setKeyboardHeight(0);
+                setKeyboardVisible(false);
+            }
+        );
+
+        return () => {
+            keyboardWillShowListener.remove();
+            keyboardWillHideListener.remove();
+        };
+    }, []);
 
     // 메시지를 읽음으로 표시
     useEffect(() => {
@@ -96,8 +137,14 @@ export default function ChatDetailScreen() {
     const navigationBarHeight = 44;
     const headerHeight = statusBarHeight + navigationBarHeight;
 
+    // 안전한 하단 패딩 계산
+    const safeBottomPadding = Platform.OS === 'ios' ? Math.max(insets.bottom, 16) : 16;
+
+    // 입력창 하단 위치 계산
+    const inputBottomPosition = keyboardVisible ? keyboardHeight : 0;
+
     return (
-        <View style={{ flex: 1, backgroundColor }}>
+        <View style={[styles.container, { backgroundColor }]}>
             <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
 
             {/* 커스텀 헤더 배경 오버레이 */}
@@ -133,110 +180,111 @@ export default function ChatDetailScreen() {
                 }}
             />
 
-            <View style={styles.container}>
-                <FlatList
-                    ref={flatListRef}
-                    data={chatMessages}
-                    keyExtractor={item => item.id}
-                    contentContainerStyle={[
-                        styles.messageList,
-                        { paddingTop: headerHeight + 8 } // 헤더 높이 + 약간의 여백
-                    ]}
-                    onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-                    onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
-                    renderItem={({ item, index }) => {
-                        const isUser = item.senderId === user.id;
-                        const sameGroup = isSameGroup(index);
-                        const showSenderName = !isUser && !sameGroup;
-                        const showTime = !sameGroup || index === chatMessages.length - 1;
-                        const showAvatar = !isUser && !sameGroup;
+            <FlatList
+                ref={flatListRef}
+                data={chatMessages}
+                keyExtractor={item => item.id}
+                contentContainerStyle={[
+                    styles.messageList,
+                    { paddingTop: headerHeight + 8, paddingBottom: 70 }
+                ]}
+                onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+                onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+                renderItem={({ item, index }) => {
+                    const isUser = item.senderId === user.id;
+                    const sameGroup = isSameGroup(index);
+                    const showSenderName = !isUser && !sameGroup;
+                    const showTime = !sameGroup || index === chatMessages.length - 1;
+                    const showAvatar = !isUser && !sameGroup;
 
-                        return (
-                            <View style={[
-                                styles.messageContainer,
-                                isUser ? styles.userMessageContainer : styles.otherMessageContainer,
-                                sameGroup && styles.groupedMessage
-                            ]}>
-                                {showSenderName && (
-                                    <ThemedText style={styles.senderName}>
-                                        {friends.find(f => f.id === item.senderId)?.name || '알 수 없음'}
-                                    </ThemedText>
+                    return (
+                        <View style={[
+                            styles.messageContainer,
+                            isUser ? styles.userMessageContainer : styles.otherMessageContainer,
+                            sameGroup && styles.groupedMessage
+                        ]}>
+                            {showSenderName && (
+                                <ThemedText style={styles.senderName}>
+                                    {friends.find(f => f.id === item.senderId)?.name || '알 수 없음'}
+                                </ThemedText>
+                            )}
+
+                            <View style={styles.messageRow}>
+                                {!isUser && (
+                                    showAvatar ? (
+                                        <Avatar.Image
+                                            source={{ uri: getProfileImage(item.senderId) }}
+                                            size={36}
+                                            style={styles.avatar}
+                                        />
+                                    ) : (
+                                        <View style={styles.avatarPlaceholder} />
+                                    )
                                 )}
 
-                                <View style={styles.messageRow}>
-                                    {!isUser && (
-                                        showAvatar ? (
-                                            <Avatar.Image
-                                                source={{ uri: getProfileImage(item.senderId) }}
-                                                size={36}
-                                                style={styles.avatar}
-                                            />
-                                        ) : (
-                                            <View style={styles.avatarPlaceholder} />
-                                        )
-                                    )}
-
-                                    <View style={[
-                                        styles.messageBubble,
-                                        isUser ? styles.userBubble : styles.otherBubble
-                                    ]}>
-                                        <ThemedText style={isUser ? styles.userMessageText : styles.otherMessageText}>
-                                            {item.text}
-                                        </ThemedText>
-                                    </View>
-
-                                    {showTime && (
-                                        <ThemedText style={[
-                                            styles.messageTime,
-                                            isUser ? styles.userMessageTime : styles.otherMessageTime
-                                        ]}>
-                                            {formatTime(item.createdAt)}
-                                        </ThemedText>
-                                    )}
+                                <View style={[
+                                    styles.messageBubble,
+                                    isUser ? styles.userBubble : styles.otherBubble
+                                ]}>
+                                    <ThemedText style={isUser ? styles.userMessageText : styles.otherMessageText}>
+                                        {item.text}
+                                    </ThemedText>
                                 </View>
-                            </View>
-                        );
-                    }}
-                />
-            </View>
 
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
-                style={styles.inputContainer}
+                                {showTime && (
+                                    <ThemedText style={[
+                                        styles.messageTime,
+                                        isUser ? styles.userMessageTime : styles.otherMessageTime
+                                    ]}>
+                                        {formatTime(item.createdAt)}
+                                    </ThemedText>
+                                )}
+                            </View>
+                        </View>
+                    );
+                }}
+            />
+
+            {/* 입력창 - 키보드 높이에 따라 위치 조정 */}
+            <View
+                style={[
+                    styles.inputContainer,
+                    {
+                        bottom: inputBottomPosition,
+                        paddingBottom: keyboardVisible ? 0 : safeBottomPadding
+                    }
+                ]}
             >
-                <View style={styles.inputWrapperOuter}>
-                    <View style={styles.inputWrapper}>
-                        <TouchableOpacity style={styles.plusButton}>
-                            <IconButton icon="plus" size={26} iconColor="#333" style={{ margin: 0 }} />
+                <View style={styles.inputWrapper}>
+                    <TouchableOpacity style={styles.plusButton}>
+                        <IconButton icon="plus" size={26} iconColor="#333" style={{ margin: 0 }} />
+                    </TouchableOpacity>
+
+                    <RNTextInput
+                        ref={messageInputRef}
+                        value={messageText}
+                        onChangeText={setMessageText}
+                        placeholder="메시지 입력..."
+                        style={styles.input}
+                        multiline
+                        placeholderTextColor="#aaa"
+                    />
+
+                    {messageText.trim() !== '' ? (
+                        <TouchableOpacity
+                            style={styles.sendButton}
+                            onPress={handleSendMessage}
+                        >
+                            <ThemedText style={styles.sendButtonText}>전송</ThemedText>
                         </TouchableOpacity>
-
-                        <RNTextInput
-                            ref={messageInputRef}
-                            value={messageText}
-                            onChangeText={setMessageText}
-                            placeholder="메시지 입력..."
-                            style={styles.input}
-                            multiline
-                            placeholderTextColor="#aaa"
-                        />
-
-                        {messageText.trim() !== '' ? (
-                            <TouchableOpacity
-                                style={styles.sendButton}
-                                onPress={handleSendMessage}
-                            >
-                                <ThemedText style={styles.sendButtonText}>전송</ThemedText>
-                            </TouchableOpacity>
-                        ) : (
-                            <View style={styles.inputButtons}>
-                                <IconButton icon="emoticon" size={26} iconColor="#333" style={styles.inputButton} />
-                                <IconButton icon="pound" size={26} iconColor="#333" style={styles.inputButton} />
-                            </View>
-                        )}
-                    </View>
+                    ) : (
+                        <View style={styles.inputButtons}>
+                            <IconButton icon="emoticon" size={26} iconColor="#333" style={styles.inputButton} />
+                            <IconButton icon="pound" size={26} iconColor="#333" style={styles.inputButton} />
+                        </View>
+                    )}
                 </View>
-            </KeyboardAvoidingView>
+            </View>
         </View>
     );
 }
@@ -250,14 +298,13 @@ const styles = StyleSheet.create({
         top: 0,
         left: 0,
         right: 0,
-        zIndex: 10, // 헤더를 FlatList 위에 표시
+        zIndex: 10,
     },
     headerRight: {
         flexDirection: 'row',
     },
     messageList: {
         paddingHorizontal: 12,
-        paddingBottom: 80, // 입력창 높이보다 충분한 여백
     },
     messageContainer: {
         marginBottom: 4,
@@ -278,7 +325,7 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#666',
         marginBottom: 3,
-        marginLeft: 44, // 아바타 이미지 크기 + 여백
+        marginLeft: 44,
     },
     messageRow: {
         flexDirection: 'row',
@@ -297,7 +344,7 @@ const styles = StyleSheet.create({
         maxWidth: '80%',
     },
     userBubble: {
-        backgroundColor: '#FEE500', // 카카오톡 노란색
+        backgroundColor: '#FEE500',
         borderTopRightRadius: 3,
     },
     otherBubble: {
@@ -326,23 +373,17 @@ const styles = StyleSheet.create({
     },
     inputContainer: {
         position: 'absolute',
-        bottom: 0,
         left: 0,
         right: 0,
         backgroundColor: 'white',
         borderTopWidth: 0.5,
         borderTopColor: '#d8d8d8',
     },
-    inputWrapperOuter: {
-        backgroundColor: 'white',
-    },
     inputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 5,
         paddingVertical: 8,
-        paddingBottom: Platform.OS === 'ios' ? 24 : 8,
-        backgroundColor: 'white',
     },
     plusButton: {
         marginHorizontal: 2,
