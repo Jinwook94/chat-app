@@ -220,7 +220,7 @@ export default function ChatDetailScreen() {
                                 <View style={[
                                     styles.messageContainer,
                                     isUser ? styles.userMessageContainer : styles.otherMessageContainer,
-                                    sameGroup && styles.groupedMessage
+                                    { marginBottom: sameGroup ? 1 : 4 }
                                 ]}>
                                     {showSenderName && (
                                         <ThemedText style={styles.senderName}>
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
     },
     messageContainer: {
         marginBottom: 4,
-        maxWidth: '75%',
+        maxWidth: '85%',
     },
     userMessageContainer: {
         alignSelf: 'flex-end',
@@ -356,9 +356,6 @@ const styles = StyleSheet.create({
     otherMessageContainer: {
         alignSelf: 'flex-start',
         marginLeft: 5,
-    },
-    groupedMessage: {
-        marginBottom: 1,
     },
     senderName: {
         fontSize: 12,
@@ -380,7 +377,8 @@ const styles = StyleSheet.create({
     messageBubble: {
         padding: 9,
         borderRadius: 13,
-        maxWidth: '80%',
+        minWidth: 40, // 최소 너비 추가
+        maxWidth: '100%', // 컨테이너 내에서 최대 너비 사용
     },
     userBubble: {
         backgroundColor: '#FEE500',
@@ -414,12 +412,14 @@ const styles = StyleSheet.create({
         backgroundColor: 'white',
         borderTopWidth: 0.5,
         borderTopColor: '#d8d8d8',
+        width: '100%',
     },
     inputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 5,
         paddingVertical: 8,
+        width: '100%',
     },
     plusButton: {
         marginHorizontal: 2,
@@ -433,10 +433,12 @@ const styles = StyleSheet.create({
         backgroundColor: '#f5f5f5',
         borderRadius: 20,
         paddingHorizontal: 12,
+        paddingRight: 20,
         paddingTop: 8,
         paddingBottom: 8,
         marginHorizontal: 8,
         fontSize: 16,
+        textAlign: 'left',
     },
     sendButton: {
         backgroundColor: '#FEE500',
