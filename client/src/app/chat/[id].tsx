@@ -117,16 +117,45 @@ export default function ChatDetailScreen() {
         return `${ampm} ${formattedHours}:${formattedMinutes}`;
     };
 
-    // 같은 날짜의 연속 메시지인지 확인
+    // timestamp 를 분 단위로 변환하는 헬퍼 함수
+    const getMinuteFromTimestamp = (timestamp: number) => {
+        const date = new Date(timestamp);
+        return date.getHours() * 60 + date.getMinutes(); // 시간과 분을 합쳐 분 단위로 변환
+    };
+
+    // 같은 그룹의 메시지인지 확인
     const isSameGroup = (currentIndex: number) => {
         if (currentIndex === 0) return false;
 
         const currentMsg = chatMessages[currentIndex];
         const prevMsg = chatMessages[currentIndex - 1];
 
-        // 같은 보낸사람이고 5분 이내 메시지인지 확인
-        return currentMsg.senderId === prevMsg.senderId &&
-            currentMsg.createdAt - prevMsg.createdAt < 5 * 60 * 1000;
+        // 같은 보낸 사람인지 확인
+        if (currentMsg.senderId !== prevMsg.senderId) return false;
+
+        // 같은 분(minute)에 보낸 메시지인지 확인
+        const currentMinute = getMinuteFromTimestamp(currentMsg.createdAt);
+        const prevMinute = getMinuteFromTimestamp(prevMsg.createdAt);
+
+        return currentMinute === prevMinute;
+    };
+
+    // 현재 메시지가 그룹의 마지막 메시지인지 확인
+    const isLastMessageInGroup = (currentIndex: number) => {
+        // 마지막 메시지는 항상 그룹의 마지막 메시지
+        if (currentIndex === chatMessages.length - 1) return true;
+
+        const currentMsg = chatMessages[currentIndex];
+        const nextMsg = chatMessages[currentIndex + 1];
+
+        // 다음 메시지의 보낸 사람이 다르면 현재 메시지는 그룹의 마지막
+        if (currentMsg.senderId !== nextMsg.senderId) return true;
+
+        // 다음 메시지가 다른 분(minute)에 보내졌으면 현재 메시지는 그룹의 마지막
+        const currentMinute = getMinuteFromTimestamp(currentMsg.createdAt);
+        const nextMinute = getMinuteFromTimestamp(nextMsg.createdAt);
+
+        return currentMinute !== nextMinute;
     };
 
     // 프로필 이미지 가져오기
@@ -213,7 +242,8 @@ export default function ChatDetailScreen() {
                             const isUser = item.senderId === user.id;
                             const sameGroup = isSameGroup(index);
                             const showSenderName = !isUser && !sameGroup;
-                            const showTime = !sameGroup || index === chatMessages.length - 1;
+                            // 그룹의 마지막 메시지일 때만 시간 표시
+                            const showTime = isLastMessageInGroup(index);
                             const showAvatar = !isUser && !sameGroup;
 
                             return (
