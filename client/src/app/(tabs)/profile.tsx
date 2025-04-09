@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Avatar, Button, TextInput, Portal, Modal } from 'react-native-paper';
 import ColorPicker from 'react-native-wheel-color-picker';
 import { ThemedText } from '@/src/components/ThemedText';
@@ -7,6 +7,8 @@ import { ThemedView } from '@/src/components/ThemedView';
 import { useUserStore } from '@/src/stores/userStore';
 import { useThemeStore } from '@/src/stores/themeStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from '@/src/components/KeyboardAwareScrollView';
+import { AndroidSoftInputModes, KeyboardController } from 'react-native-keyboard-controller';
 
 export default function ProfileScreen() {
     const { user, updateUser } = useUserStore();
@@ -18,6 +20,18 @@ export default function ProfileScreen() {
     const [statusMessage, setStatusMessage] = useState(user?.statusMessage || '');
     const [colorPickerVisible, setColorPickerVisible] = useState(false);
     const [currentColor, setCurrentColor] = useState(primaryColor);
+
+    // Android에서 adjustResize 모드 설정
+    useEffect(() => {
+        if (Platform.OS === 'android') {
+            KeyboardController.setInputMode(
+                AndroidSoftInputModes.SOFT_INPUT_ADJUST_RESIZE
+            );
+            return () => {
+                KeyboardController.setDefaultMode();
+            };
+        }
+    }, []);
 
     if (!user) {
         return (
@@ -51,81 +65,86 @@ export default function ProfileScreen() {
                 <ThemedText type="title">프로필</ThemedText>
             </View>
 
-            <View style={styles.profileContainer}>
-                <TouchableOpacity onPress={handleRandomAvatar}>
-                    <Avatar.Image
-                        source={{ uri: user.avatar }}
-                        size={120}
-                        style={styles.avatar}
-                    />
-                    <View style={styles.avatarOverlay}>
-                        <ThemedText style={styles.avatarText}>변경</ThemedText>
-                    </View>
-                </TouchableOpacity>
-
-                {isEditing ? (
-                    <View style={styles.editContainer}>
-                        <TextInput
-                            label="이름"
-                            value={name}
-                            onChangeText={setName}
-                            style={styles.input}
+            <KeyboardAwareScrollView
+                contentContainerStyle={styles.scrollContent}
+                extraScrollHeight={20}
+            >
+                <View style={styles.profileContainer}>
+                    <TouchableOpacity onPress={handleRandomAvatar}>
+                        <Avatar.Image
+                            source={{ uri: user.avatar }}
+                            size={120}
+                            style={styles.avatar}
                         />
-                        <TextInput
-                            label="상태 메시지"
-                            value={statusMessage}
-                            onChangeText={setStatusMessage}
-                            style={styles.input}
-                        />
+                        <View style={styles.avatarOverlay}>
+                            <ThemedText style={styles.avatarText}>변경</ThemedText>
+                        </View>
+                    </TouchableOpacity>
 
-                        <View style={styles.editButtons}>
+                    {isEditing ? (
+                        <View style={styles.editContainer}>
+                            <TextInput
+                                label="이름"
+                                value={name}
+                                onChangeText={setName}
+                                style={styles.input}
+                            />
+                            <TextInput
+                                label="상태 메시지"
+                                value={statusMessage}
+                                onChangeText={setStatusMessage}
+                                style={styles.input}
+                            />
+
+                            <View style={styles.editButtons}>
+                                <Button
+                                    mode="outlined"
+                                    onPress={() => {
+                                        setIsEditing(false);
+                                        setName(user.name);
+                                        setStatusMessage(user.statusMessage);
+                                    }}
+                                    style={[styles.editButton, { marginRight: 8 }]}
+                                >
+                                    취소
+                                </Button>
+                                <Button
+                                    mode="contained"
+                                    onPress={handleSave}
+                                    style={styles.editButton}
+                                >
+                                    저장
+                                </Button>
+                            </View>
+                        </View>
+                    ) : (
+                        <View style={styles.infoContainer}>
+                            <ThemedText type="title" style={styles.name}>{user.name}</ThemedText>
+                            <ThemedText style={styles.statusMessage}>{user.statusMessage}</ThemedText>
+
                             <Button
                                 mode="outlined"
-                                onPress={() => {
-                                    setIsEditing(false);
-                                    setName(user.name);
-                                    setStatusMessage(user.statusMessage);
-                                }}
-                                style={[styles.editButton, { marginRight: 8 }]}
+                                onPress={() => setIsEditing(true)}
+                                style={styles.editProfileButton}
                             >
-                                취소
-                            </Button>
-                            <Button
-                                mode="contained"
-                                onPress={handleSave}
-                                style={styles.editButton}
-                            >
-                                저장
+                                프로필 수정
                             </Button>
                         </View>
-                    </View>
-                ) : (
-                    <View style={styles.infoContainer}>
-                        <ThemedText type="title" style={styles.name}>{user.name}</ThemedText>
-                        <ThemedText style={styles.statusMessage}>{user.statusMessage}</ThemedText>
+                    )}
+                </View>
 
-                        <Button
-                            mode="outlined"
-                            onPress={() => setIsEditing(true)}
-                            style={styles.editProfileButton}
-                        >
-                            프로필 수정
-                        </Button>
-                    </View>
-                )}
-            </View>
+                <View style={styles.settingsContainer}>
+                    <ThemedText type="subtitle" style={styles.settingsTitle}>앱 설정</ThemedText>
 
-            <View style={styles.settingsContainer}>
-                <ThemedText type="subtitle" style={styles.settingsTitle}>앱 설정</ThemedText>
-
-                <TouchableOpacity
-                    style={styles.settingItem}
-                    onPress={() => setColorPickerVisible(true)}
-                >
-                    <ThemedText>앱 테마 색상</ThemedText>
-                    <View style={[styles.colorPreview, { backgroundColor: primaryColor }]} />
-                </TouchableOpacity>
-            </View>
+                    <TouchableOpacity
+                        style={styles.settingItem}
+                        onPress={() => setColorPickerVisible(true)}
+                    >
+                        <ThemedText>앱 테마 색상</ThemedText>
+                        <View style={[styles.colorPreview, { backgroundColor: primaryColor }]} />
+                    </TouchableOpacity>
+                </View>
+            </KeyboardAwareScrollView>
 
             <Portal>
                 <Modal
@@ -173,6 +192,10 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
+        paddingBottom: 20,
     },
     header: {
         paddingHorizontal: 16,

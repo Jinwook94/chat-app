@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
     View, StyleSheet, FlatList, Platform, TextInput as RNTextInput,
-    TouchableOpacity, StatusBar, Keyboard, KeyboardEvent
+    TouchableOpacity, StatusBar, Keyboard, TouchableWithoutFeedback
 } from 'react-native';
 import { IconButton, Avatar } from 'react-native-paper';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
@@ -11,6 +11,11 @@ import { useChatStore } from '@/src/stores/chatStore';
 import { useUserStore } from '@/src/stores/userStore';
 import { useFriendsStore } from '@/src/stores/friendsStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+    AndroidSoftInputModes,
+    KeyboardController,
+    KeyboardStickyView
+} from 'react-native-keyboard-controller';
 
 export default function ChatDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -23,44 +28,55 @@ export default function ChatDetailScreen() {
     const chatMessages = messages[id] || [];
 
     const [messageText, setMessageText] = useState('');
-    const [keyboardHeight, setKeyboardHeight] = useState(0);
-    const [keyboardVisible, setKeyboardVisible] = useState(false);
-
     const messageInputRef = useRef<RNTextInput>(null);
     const flatListRef = useRef<FlatList>(null);
 
-    // 키보드 이벤트 처리기
+    const isIOS = Platform.OS === 'ios';
+
+    // Android에서 소프트 입력 모드 설정
     useEffect(() => {
-        // iOS에서는 키보드가 나타나기 전에 미리 준비(willShow)
-        // Android에서는 키보드가 나타난 후(didShow)
-        const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-        const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+        if (Platform.OS === 'android') {
+            KeyboardController.setInputMode(
+                AndroidSoftInputModes.SOFT_INPUT_ADJUST_RESIZE
+            );
+            return () => {
+                KeyboardController.setDefaultMode();
+            };
+        }
+    }, []);
 
-        const keyboardWillShowListener = Keyboard.addListener(
-            showEvent,
-            (e: KeyboardEvent) => {
-                // 키보드의 정확한 높이 값을 저장
-                setKeyboardHeight(e.endCoordinates.height);
-                setKeyboardVisible(true);
+    // iOS에서 TextInput 초기화
+    useEffect(() => {
+        if (isIOS) {
+            // 약간의 지연 후 초기 focus 시도
+            const timeout = setTimeout(() => {
+                if (messageInputRef.current) {
+                    messageInputRef.current.focus();
+                    setTimeout(() => {
+                        // 바로 blur 처리하여 초기화
+                        Keyboard.dismiss();
+                    }, 50);
+                }
+            }, 300);
 
+            return () => clearTimeout(timeout);
+        }
+    }, [isIOS]);
+
+    // 키보드 이벤트 감지
+    useEffect(() => {
+        const keyboardDidShowListener = Keyboard.addListener(
+            'keyboardDidShow',
+            () => {
                 // 키보드가 올라오면 스크롤을 맨 아래로
                 setTimeout(() => {
-                    flatListRef.current?.scrollToEnd({ animated: false });
-                }, 50);
-            }
-        );
-
-        const keyboardWillHideListener = Keyboard.addListener(
-            hideEvent,
-            () => {
-                setKeyboardHeight(0);
-                setKeyboardVisible(false);
+                    flatListRef.current?.scrollToEnd({ animated: true });
+                }, 100);
             }
         );
 
         return () => {
-            keyboardWillShowListener.remove();
-            keyboardWillHideListener.remove();
+            keyboardDidShowListener.remove();
         };
     }, []);
 
@@ -96,7 +112,15 @@ export default function ChatDetailScreen() {
 
         sendMessage(id, messageText);
         setMessageText('');
-        messageInputRef.current?.focus();
+
+        // 메시지 전송 후 스크롤 아래로
+        setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+            // iOS에서는 포커스 유지
+            if (isIOS) {
+                messageInputRef.current?.focus();
+            }
+        }, 100);
     };
 
     // 시간 형식화
@@ -130,6 +154,16 @@ export default function ChatDetailScreen() {
         return sender?.avatar || '';
     };
 
+    // 백그라운드 탭 시 키보드 숨기기
+    const dismissKeyboard = () => {
+        Keyboard.dismiss();
+    };
+
+    // 입력창 포커스 처리
+    const handleInputPress = () => {
+        messageInputRef.current?.focus();
+    };
+
     const backgroundColor = chatRoom.backgroundColor || '#9bbbd4';
 
     // 헤더 높이 계산
@@ -137,11 +171,10 @@ export default function ChatDetailScreen() {
     const navigationBarHeight = 44;
     const headerHeight = statusBarHeight + navigationBarHeight;
 
-    // 안전한 하단 패딩 계산
-    const safeBottomPadding = Platform.OS === 'ios' ? Math.max(insets.bottom, 16) : 16;
-
-    // 입력창 하단 위치 계산
-    const inputBottomPosition = keyboardVisible ? keyboardHeight : 0;
+    // iOS와 Android에 맞게 offset 설정
+    const keyboardStickyViewOffset = Platform.OS === 'ios'
+        ? { closed: 0, opened: insets.bottom }
+        : undefined;
 
     return (
         <View style={[styles.container, { backgroundColor }]}>
@@ -180,95 +213,116 @@ export default function ChatDetailScreen() {
                 }}
             />
 
-            <FlatList
-                ref={flatListRef}
-                data={chatMessages}
-                keyExtractor={item => item.id}
-                contentContainerStyle={[
-                    styles.messageList,
-                    { paddingTop: headerHeight + 8, paddingBottom: 70 }
-                ]}
-                onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-                onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
-                renderItem={({ item, index }) => {
-                    const isUser = item.senderId === user.id;
-                    const sameGroup = isSameGroup(index);
-                    const showSenderName = !isUser && !sameGroup;
-                    const showTime = !sameGroup || index === chatMessages.length - 1;
-                    const showAvatar = !isUser && !sameGroup;
+            {/* 백그라운드 탭하면 키보드 숨기기 */}
+            <TouchableWithoutFeedback onPress={dismissKeyboard}>
+                <View style={styles.backgroundTouchArea}>
+                    {/* 메시지 목록 */}
+                    <FlatList
+                        ref={flatListRef}
+                        data={chatMessages}
+                        keyExtractor={item => item.id}
+                        contentContainerStyle={[
+                            styles.messageList,
+                            { paddingTop: headerHeight + 8, paddingBottom: 70 + insets.bottom }
+                        ]}
+                        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+                        onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+                        renderItem={({ item, index }) => {
+                            const isUser = item.senderId === user.id;
+                            const sameGroup = isSameGroup(index);
+                            const showSenderName = !isUser && !sameGroup;
+                            const showTime = !sameGroup || index === chatMessages.length - 1;
+                            const showAvatar = !isUser && !sameGroup;
 
-                    return (
-                        <View style={[
-                            styles.messageContainer,
-                            isUser ? styles.userMessageContainer : styles.otherMessageContainer,
-                            sameGroup && styles.groupedMessage
-                        ]}>
-                            {showSenderName && (
-                                <ThemedText style={styles.senderName}>
-                                    {friends.find(f => f.id === item.senderId)?.name || '알 수 없음'}
-                                </ThemedText>
-                            )}
-
-                            <View style={styles.messageRow}>
-                                {!isUser && (
-                                    showAvatar ? (
-                                        <Avatar.Image
-                                            source={{ uri: getProfileImage(item.senderId) }}
-                                            size={36}
-                                            style={styles.avatar}
-                                        />
-                                    ) : (
-                                        <View style={styles.avatarPlaceholder} />
-                                    )
-                                )}
-
+                            return (
                                 <View style={[
-                                    styles.messageBubble,
-                                    isUser ? styles.userBubble : styles.otherBubble
+                                    styles.messageContainer,
+                                    isUser ? styles.userMessageContainer : styles.otherMessageContainer,
+                                    sameGroup && styles.groupedMessage
                                 ]}>
-                                    <ThemedText style={isUser ? styles.userMessageText : styles.otherMessageText}>
-                                        {item.text}
-                                    </ThemedText>
+                                    {showSenderName && (
+                                        <ThemedText style={styles.senderName}>
+                                            {friends.find(f => f.id === item.senderId)?.name || '알 수 없음'}
+                                        </ThemedText>
+                                    )}
+
+                                    <View style={styles.messageRow}>
+                                        {!isUser && (
+                                            showAvatar ? (
+                                                <Avatar.Image
+                                                    source={{ uri: getProfileImage(item.senderId) }}
+                                                    size={36}
+                                                    style={styles.avatar}
+                                                />
+                                            ) : (
+                                                <View style={styles.avatarPlaceholder} />
+                                            )
+                                        )}
+
+                                        <View style={[
+                                            styles.messageBubble,
+                                            isUser ? styles.userBubble : styles.otherBubble
+                                        ]}>
+                                            <ThemedText style={isUser ? styles.userMessageText : styles.otherMessageText}>
+                                                {item.text}
+                                            </ThemedText>
+                                        </View>
+
+                                        {showTime && (
+                                            <ThemedText style={[
+                                                styles.messageTime,
+                                                isUser ? styles.userMessageTime : styles.otherMessageTime
+                                            ]}>
+                                                {formatTime(item.createdAt)}
+                                            </ThemedText>
+                                        )}
+                                    </View>
                                 </View>
+                            );
+                        }}
+                    />
+                </View>
+            </TouchableWithoutFeedback>
 
-                                {showTime && (
-                                    <ThemedText style={[
-                                        styles.messageTime,
-                                        isUser ? styles.userMessageTime : styles.otherMessageTime
-                                    ]}>
-                                        {formatTime(item.createdAt)}
-                                    </ThemedText>
-                                )}
-                            </View>
-                        </View>
-                    );
-                }}
-            />
-
-            {/* 입력창 - 키보드 높이에 따라 위치 조정 */}
-            <View
-                style={[
-                    styles.inputContainer,
-                    {
-                        bottom: inputBottomPosition,
-                        paddingBottom: keyboardVisible ? 0 : safeBottomPadding
-                    }
-                ]}
+            {/* 입력창 */}
+            <KeyboardStickyView
+                offset={keyboardStickyViewOffset}
+                style={[styles.inputContainer, { paddingBottom: insets.bottom }]}
             >
                 <View style={styles.inputWrapper}>
                     <TouchableOpacity style={styles.plusButton}>
                         <IconButton icon="plus" size={26} iconColor="#333" style={{ margin: 0 }} />
                     </TouchableOpacity>
 
-                    <RNTextInput
-                        ref={messageInputRef}
-                        value={messageText}
-                        onChangeText={setMessageText}
-                        placeholder="메시지 입력..."
-                        style={styles.input}
-                        multiline
-                        placeholderTextColor="#aaa"
-                    />
+                    {isIOS ? (
+                        // iOS에서는 TouchableOpacity로 감싸서 focus 문제 해결
+                        <TouchableOpacity
+                            activeOpacity={0.9}
+                            onPress={handleInputPress}
+                            style={styles.inputTouch}
+                        >
+                            <RNTextInput
+                                ref={messageInputRef}
+                                value={messageText}
+                                onChangeText={setMessageText}
+                                placeholder="메시지 입력..."
+                                style={styles.input}
+                                multiline
+                                placeholderTextColor="#aaa"
+                            />
+                        </TouchableOpacity>
+                    ) : (
+                        // Android는 기존 방식 유지
+                        <RNTextInput
+                            ref={messageInputRef}
+                            value={messageText}
+                            onChangeText={setMessageText}
+                            placeholder="메시지 입력..."
+                            style={styles.input}
+                            multiline
+                            placeholderTextColor="#aaa"
+                        />
+                    )}
 
                     {messageText.trim() !== '' ? (
                         <TouchableOpacity
@@ -284,13 +338,16 @@ export default function ChatDetailScreen() {
                         </View>
                     )}
                 </View>
-            </View>
+            </KeyboardStickyView>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
+        flex: 1,
+    },
+    backgroundTouchArea: {
         flex: 1,
     },
     headerOverlay: {
@@ -372,9 +429,6 @@ const styles = StyleSheet.create({
         marginLeft: 2,
     },
     inputContainer: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
         backgroundColor: 'white',
         borderTopWidth: 0.5,
         borderTopColor: '#d8d8d8',
@@ -387,6 +441,9 @@ const styles = StyleSheet.create({
     },
     plusButton: {
         marginHorizontal: 2,
+    },
+    inputTouch: {
+        flex: 1,
     },
     input: {
         flex: 1,

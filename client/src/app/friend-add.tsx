@@ -1,17 +1,31 @@
-import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Platform } from 'react-native';
 import { Avatar, Button, IconButton, TextInput } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
 import { Stack, router } from 'expo-router';
 import { ThemedText } from '@/src/components/ThemedText';
 import { ThemedView } from '@/src/components/ThemedView';
 import { useFriendsStore } from '@/src/stores/friendsStore';
+import { KeyboardAwareScrollView } from '@/src/components/KeyboardAwareScrollView';
+import { AndroidSoftInputModes, KeyboardController } from 'react-native-keyboard-controller';
 
 export default function FriendAddScreen() {
     const { addFriend } = useFriendsStore();
     const [name, setName] = useState('');
     const [statusMessage, setStatusMessage] = useState('');
     const [avatar, setAvatar] = useState(`https://picsum.photos/id/${Math.floor(Math.random() * 100)}/200`);
+
+    // Android에서 adjustResize 모드 설정
+    useEffect(() => {
+        if (Platform.OS === 'android') {
+            KeyboardController.setInputMode(
+                AndroidSoftInputModes.SOFT_INPUT_ADJUST_RESIZE
+            );
+            return () => {
+                KeyboardController.setDefaultMode();
+            };
+        }
+    }, []);
 
     const handleAddFriend = () => {
         if (name.trim() === '') return;
@@ -44,42 +58,44 @@ export default function FriendAddScreen() {
                 }}
             />
             <ThemedView style={styles.container}>
-                <View style={styles.avatarContainer}>
-                    <Avatar.Image
-                        source={{ uri: avatar }}
-                        size={100}
+                <KeyboardAwareScrollView contentContainerStyle={styles.scrollContent}>
+                    <View style={styles.avatarContainer}>
+                        <Avatar.Image
+                            source={{ uri: avatar }}
+                            size={100}
+                        />
+                        <IconButton
+                            icon="refresh"
+                            size={24}
+                            style={styles.refreshButton}
+                            onPress={handleRandomAvatar}
+                        />
+                    </View>
+
+                    <TextInput
+                        label="이름"
+                        value={name}
+                        onChangeText={setName}
+                        style={styles.input}
+                        autoFocus
                     />
-                    <IconButton
-                        icon="refresh"
-                        size={24}
-                        style={styles.refreshButton}
-                        onPress={handleRandomAvatar}
+
+                    <TextInput
+                        label="상태 메시지"
+                        value={statusMessage}
+                        onChangeText={setStatusMessage}
+                        style={styles.input}
                     />
-                </View>
 
-                <TextInput
-                    label="이름"
-                    value={name}
-                    onChangeText={setName}
-                    style={styles.input}
-                    autoFocus
-                />
-
-                <TextInput
-                    label="상태 메시지"
-                    value={statusMessage}
-                    onChangeText={setStatusMessage}
-                    style={styles.input}
-                />
-
-                <Button
-                    mode="contained"
-                    onPress={handleAddFriend}
-                    style={styles.button}
-                    disabled={name.trim() === ''}
-                >
-                    친구 추가
-                </Button>
+                    <Button
+                        mode="contained"
+                        onPress={handleAddFriend}
+                        style={styles.button}
+                        disabled={name.trim() === ''}
+                    >
+                        친구 추가
+                    </Button>
+                </KeyboardAwareScrollView>
             </ThemedView>
         </>
     );
@@ -88,7 +104,10 @@ export default function FriendAddScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+    },
+    scrollContent: {
         padding: 16,
+        flexGrow: 1,
     },
     avatarContainer: {
         alignItems: 'center',

@@ -7,6 +7,7 @@ import 'react-native-reanimated';
 import { PaperProvider } from 'react-native-paper';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useColorScheme } from '@/src/hooks/useColorScheme';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 // TanStack Query 클라이언트 생성
 const queryClient = new QueryClient();
@@ -33,11 +34,13 @@ export default function RootLayout() {
   return (
       <QueryClientProvider client={queryClient}>
         <PaperProvider>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="+not-found" />
-          </Stack>
-          <StatusBar style="auto" />
+          <KeyboardProvider statusBarTranslucent>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="+not-found" />
+            </Stack>
+            <StatusBar style="auto" />
+          </KeyboardProvider>
         </PaperProvider>
       </QueryClientProvider>
   );
