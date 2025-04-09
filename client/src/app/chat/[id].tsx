@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TextInput as RNTextInput, TouchableOpacity, StatusBar } from 'react-native';
+import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, TextInput as RNTextInput, TouchableOpacity, StatusBar, Dimensions } from 'react-native';
 import { IconButton, Avatar } from 'react-native-paper';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/src/components/ThemedText';
@@ -91,27 +91,26 @@ export default function ChatDetailScreen() {
 
     const backgroundColor = chatRoom.backgroundColor || '#9bbbd4';
 
-    // 헤더 높이 계산 (상태 바 + 타이틀 영역)
-    const headerHeight = Platform.OS === 'ios' ? 88 : 64;
+    // 헤더 높이 계산
+    const statusBarHeight = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 0;
+    const navigationBarHeight = 44;
+    const headerHeight = statusBarHeight + navigationBarHeight;
 
     return (
         <View style={{ flex: 1, backgroundColor }}>
             <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
+
+            {/* 커스텀 헤더 배경 오버레이 */}
+            <View style={[styles.headerOverlay, { height: headerHeight, backgroundColor: `${backgroundColor}dd` }]} />
+
             <Stack.Screen
                 options={{
                     title: getChatName(),
                     headerTransparent: true,
-                    headerBackgroundContainerStyle: {
-                        backgroundColor: `${backgroundColor}dd`,  // dd는 약 85% 투명도
-                        borderBottomWidth: 0,
-                        // 헤더 블러 효과를 더 강하게
-                        shadowOpacity: 0,
-                        elevation: 0,
-                    },
                     headerStyle: {
                         backgroundColor: 'transparent',
                     },
-                    headerShadowVisible: false,  // 그림자 제거
+                    headerShadowVisible: false,
                     headerTitleStyle: {
                         fontSize: 17,
                         fontWeight: '600',
@@ -134,25 +133,17 @@ export default function ChatDetailScreen() {
                 }}
             />
 
-            <View style={[
-                styles.container,
-                {
-                    backgroundColor,
-                    // 헤더 높이 + 추가 여백을 고려한 상단 패딩
-                    paddingTop: headerHeight + 16,
-                }
-            ]}>
+            <View style={styles.container}>
                 <FlatList
                     ref={flatListRef}
                     data={chatMessages}
                     keyExtractor={item => item.id}
-                    contentContainerStyle={styles.messageList}
+                    contentContainerStyle={[
+                        styles.messageList,
+                        { paddingTop: headerHeight + 8 } // 헤더 높이 + 약간의 여백
+                    ]}
                     onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
                     onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
-                    // 안전 영역 자동 조정 (iOS)
-                    automaticallyAdjustContentInsets={true}
-                    // 콘텐츠 인셋 동작 설정 (iOS)
-                    contentInsetAdjustmentBehavior="automatic"
                     renderItem={({ item, index }) => {
                         const isUser = item.senderId === user.id;
                         const sameGroup = isSameGroup(index);
@@ -254,14 +245,19 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
+    headerOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 10, // 헤더를 FlatList 위에 표시
+    },
     headerRight: {
         flexDirection: 'row',
     },
     messageList: {
-        paddingVertical: 8,
         paddingHorizontal: 12,
-        // 바닥에서의 여백 추가
-        paddingBottom: 16,
+        paddingBottom: 80, // 입력창 높이보다 충분한 여백
     },
     messageContainer: {
         marginBottom: 4,
