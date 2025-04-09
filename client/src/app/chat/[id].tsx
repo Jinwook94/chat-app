@@ -91,20 +91,27 @@ export default function ChatDetailScreen() {
 
     const backgroundColor = chatRoom.backgroundColor || '#9bbbd4';
 
+    // 헤더 높이 계산 (상태 바 + 타이틀 영역)
+    const headerHeight = Platform.OS === 'ios' ? 88 : 64;
+
     return (
         <View style={{ flex: 1, backgroundColor }}>
-            <StatusBar barStyle="dark-content" backgroundColor={backgroundColor} />
+            <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
             <Stack.Screen
                 options={{
                     title: getChatName(),
                     headerTransparent: true,
                     headerBackgroundContainerStyle: {
-                        backgroundColor: `${backgroundColor}CC`,  // CC는 80% 투명도
+                        backgroundColor: `${backgroundColor}dd`,  // dd는 약 85% 투명도
                         borderBottomWidth: 0,
+                        // 헤더 블러 효과를 더 강하게
+                        shadowOpacity: 0,
+                        elevation: 0,
                     },
                     headerStyle: {
                         backgroundColor: 'transparent',
                     },
+                    headerShadowVisible: false,  // 그림자 제거
                     headerTitleStyle: {
                         fontSize: 17,
                         fontWeight: '600',
@@ -127,7 +134,14 @@ export default function ChatDetailScreen() {
                 }}
             />
 
-            <View style={[styles.container, { backgroundColor, paddingTop: 40 }]}>
+            <View style={[
+                styles.container,
+                {
+                    backgroundColor,
+                    // 헤더 높이 + 추가 여백을 고려한 상단 패딩
+                    paddingTop: headerHeight + 16,
+                }
+            ]}>
                 <FlatList
                     ref={flatListRef}
                     data={chatMessages}
@@ -135,6 +149,10 @@ export default function ChatDetailScreen() {
                     contentContainerStyle={styles.messageList}
                     onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
                     onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+                    // 안전 영역 자동 조정 (iOS)
+                    automaticallyAdjustContentInsets={true}
+                    // 콘텐츠 인셋 동작 설정 (iOS)
+                    contentInsetAdjustmentBehavior="automatic"
                     renderItem={({ item, index }) => {
                         const isUser = item.senderId === user.id;
                         const sameGroup = isSameGroup(index);
@@ -242,6 +260,8 @@ const styles = StyleSheet.create({
     messageList: {
         paddingVertical: 8,
         paddingHorizontal: 12,
+        // 바닥에서의 여백 추가
+        paddingBottom: 16,
     },
     messageContainer: {
         marginBottom: 4,
