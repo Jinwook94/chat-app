@@ -45,24 +45,6 @@ export default function ChatDetailScreen() {
         }
     }, []);
 
-    // iOS에서 TextInput 초기화
-    useEffect(() => {
-        if (isIOS) {
-            // 약간의 지연 후 초기 focus 시도
-            const timeout = setTimeout(() => {
-                if (messageInputRef.current) {
-                    messageInputRef.current.focus();
-                    setTimeout(() => {
-                        // 바로 blur 처리하여 초기화
-                        Keyboard.dismiss();
-                    }, 50);
-                }
-            }, 300);
-
-            return () => clearTimeout(timeout);
-        }
-    }, [isIOS]);
-
     // 키보드 이벤트 감지
     useEffect(() => {
         const keyboardDidShowListener = Keyboard.addListener(
