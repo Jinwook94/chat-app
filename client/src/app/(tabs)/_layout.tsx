@@ -5,6 +5,7 @@ import { Colors } from '@/src/constants/Colors';
 import { useColorScheme } from '@/src/hooks/useColorScheme';
 import { IconSymbol } from '@/src/components/ui/IconSymbol';
 import { HapticTab } from '@/src/components/HapticTab';
+
 // iOS에만 있는 컴포넌트를 조건부로 임포트
 const TabBarBG = Platform.OS === 'ios'
     ? require('@/src/components/ui/TabBarBackground.ios').default
@@ -15,6 +16,7 @@ export default function TabLayout() {
 
     return (
         <Tabs
+            initialRouteName="friends"
             screenOptions={{
                 tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
                 headerShown: false,
@@ -29,14 +31,6 @@ export default function TabLayout() {
                     default: {},
                 }),
             }}>
-            <Tabs.Screen
-                name="index"
-                options={{
-                    title: '홈',
-                    // @ts-ignore - 타입 무시
-                    tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-                }}
-            />
             <Tabs.Screen
                 name="friends"
                 options={{
@@ -59,6 +53,18 @@ export default function TabLayout() {
                     title: '프로필',
                     // @ts-ignore - 타입 무시
                     tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.crop.circle.fill" color={color} />,
+                }}
+            />
+            {/* index 파일은 tabBar에서 완전히 숨김 */}
+            <Tabs.Screen
+                name="index"
+                options={{
+                    redirect: true,
+                    // tabBar에서 표시되지 않도록 설정
+                    tabBarStyle: { display: 'none' },
+                    tabBarItemStyle: { display: 'none' },
+                    tabBarIconStyle: { display: 'none' },
+                    tabBarLabelStyle: { display: 'none' },
                 }}
             />
         </Tabs>
