@@ -1,6 +1,5 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View, Text, StyleProp, ViewStyle } from 'react-native';
-import { Avatar } from 'react-native-paper';
+import { StyleSheet, TouchableOpacity, View, Text, StyleProp, ViewStyle, Image } from 'react-native';
 
 interface ProfileAvatarProps {
     name: string;
@@ -9,6 +8,7 @@ interface ProfileAvatarProps {
     onPress?: () => void;
     style?: StyleProp<ViewStyle>;
     showEditOverlay?: boolean;
+    isRounded?: boolean; // Controls rounded square vs circle
 }
 
 export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
@@ -18,8 +18,9 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
                                                                 onPress,
                                                                 style,
                                                                 showEditOverlay = false,
+                                                                isRounded = false,
                                                             }) => {
-    // 이름에서 이니셜 생성
+    // Create initials from name
     const initials = name
         .split(' ')
         .map(n => n[0])
@@ -27,34 +28,68 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
         .join('')
         .toUpperCase();
 
-    const renderAvatar = () => {
+    // Calculate border radius based on shape preference
+    // Increased to 0.4 (40%) from 0.25 to get the Kakao "squircle" look
+    const borderRadius = isRounded ? size * 0.4 : size / 2;
+
+    // Container style
+    const containerStyle: ViewStyle = {
+        width: size,
+        height: size,
+        borderRadius: borderRadius,
+        backgroundColor: avatar ? undefined : '#a0b4d6', // Kakao's light blue color
+        justifyContent: 'center',
+        alignItems: 'center',
+        overflow: 'hidden' as const,
+    };
+
+    // Render the default Kakao-style avatar (silhouette)
+    const renderDefaultAvatar = () => {
+        return (
+            <View style={kakaoAvatarStyles.container}>
+                {/* Head circle */}
+                <View style={kakaoAvatarStyles.head} />
+                {/* Body shape */}
+                <View style={kakaoAvatarStyles.body} />
+            </View>
+        );
+    };
+
+    // This function handles rendering the avatar content
+    const renderAvatarContent = () => {
         if (avatar) {
             try {
                 return (
-                    <Avatar.Image
+                    <Image
                         source={{ uri: avatar }}
-                        size={size}
-                        // 이미지 로드 실패시 텍스트 아바타로 대체
-                        onError={() => console.warn("Avatar image load failed")}
+                        style={{
+                            width: size,
+                            height: size,
+                        }}
+                        resizeMode="cover"
                     />
                 );
             } catch (error) {
                 console.error("Error rendering avatar image:", error);
-                return <Avatar.Text size={size} label={initials} />;
+                return renderDefaultAvatar();
             }
         } else {
-            return <Avatar.Text size={size} label={initials} />;
+            // If no avatar, show Kakao-style default avatar
+            return renderDefaultAvatar();
         }
     };
 
+    // Wrap in TouchableOpacity if onPress is provided
     if (onPress) {
         return (
             <TouchableOpacity
                 onPress={onPress}
-                style={[styles.container, style]}
+                style={[styles.outerContainer, style]}
                 activeOpacity={0.8}
             >
-                {renderAvatar()}
+                <View style={containerStyle}>
+                    {renderAvatarContent()}
+                </View>
                 {showEditOverlay && (
                     <View style={styles.editOverlay}>
                         <Text style={styles.editText}>변경</Text>
@@ -65,15 +100,47 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
     }
 
     return (
-        <View style={[styles.container, style]}>
-            {renderAvatar()}
+        <View style={[styles.outerContainer, style]}>
+            <View style={containerStyle}>
+                {renderAvatarContent()}
+            </View>
         </View>
     );
 };
 
-const styles = StyleSheet.create({
+// Styles for the Kakao default avatar silhouette
+const kakaoAvatarStyles = StyleSheet.create({
     container: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: '100%',
+        height: '100%',
+    },
+    head: {
+        width: '30%',
+        height: '30%',
+        borderRadius: 50,
+        backgroundColor: '#d6e2f3',
+        marginBottom: '5%',
+    },
+    body: {
+        width: '50%',
+        height: '25%',
+        borderTopLeftRadius: 50,
+        borderTopRightRadius: 50,
+        backgroundColor: '#d6e2f3',
+    },
+});
+
+const styles = StyleSheet.create({
+    outerContainer: {
         position: 'relative',
+    },
+    initials: {
+        fontSize: 24,
+        color: '#FFFFFF',
+        fontWeight: 'bold',
     },
     editOverlay: {
         position: 'absolute',
