@@ -21,7 +21,7 @@ extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
   }
 }
 
-rootProject.name = 'client'
+rootProject.name = '메신저'
 
 dependencyResolutionManagement {
   versionCatalogs {
