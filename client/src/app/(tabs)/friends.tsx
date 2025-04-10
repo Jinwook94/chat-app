@@ -94,7 +94,7 @@ export default function FriendsScreen() {
                         return (
                             <TouchableOpacity
                                 style={styles.myProfileItem}
-                                onPress={() => router.push('/profile')}
+                                onPress={() => router.push('/my-profile-detail')}
                             >
                                 <ProfileAvatar
                                     name={user.name}
