@@ -16,6 +16,7 @@ import {
     AndroidSoftInputModes,
     KeyboardController
 } from 'react-native-keyboard-controller';
+import {ProfileAvatar} from "@/src/components/ProfileAvatar";
 
 export default function ChatDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -172,7 +173,7 @@ export default function ChatDetailScreen() {
     const getProfileImage = (senderId: string) => {
         if (senderId === user.id) return user.avatar;
         const sender = friends.find(f => f.id === senderId);
-        return sender?.avatar || '';
+        return sender?.avatar;
     };
 
     // 백그라운드 탭 시 키보드 숨기기
@@ -271,8 +272,9 @@ export default function ChatDetailScreen() {
                                             {/* 타인 아바타 표시 */}
                                             {!isUser && (
                                                 showAvatar ? (
-                                                    <Avatar.Image
-                                                        source={{ uri: getProfileImage(item.senderId) }}
+                                                    <ProfileAvatar
+                                                        name={friends.find(f => f.id === item.senderId)?.name || '알 수 없음'}
+                                                        avatar={getProfileImage(item.senderId)}
                                                         size={36}
                                                         style={styles.avatar}
                                                     />

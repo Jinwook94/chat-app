@@ -1,10 +1,8 @@
-import { User } from '../stores/userStore';
-
 // 친구 모델
 export interface Friend {
     id: string;
     name: string;
-    avatar: string;
+    avatar?: string;
     statusMessage: string;
 }
 

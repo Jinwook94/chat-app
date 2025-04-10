@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View, StatusBar } from 'react-native';
-import { Avatar, Divider, IconButton, Searchbar } from 'react-native-paper';
+import { Divider, IconButton, Searchbar } from 'react-native-paper';
 import { router } from 'expo-router';
 import { ThemedText } from '@/src/components/ThemedText';
 import { ThemedView } from '@/src/components/ThemedView';
 import { useFriendsStore } from '@/src/stores/friendsStore';
-import {User, useUserStore} from '@/src/stores/userStore';
+import { User, useUserStore } from '@/src/stores/userStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {Friend} from "@/src/types/models";
+import { Friend } from "@/src/types/models";
+import { ProfileAvatar } from '@/src/components/ProfileAvatar';
 
 type FriendsListItem =
     | { type: 'myProfile', data: User | null }
@@ -95,8 +96,9 @@ export default function FriendsScreen() {
                                 style={styles.myProfileItem}
                                 onPress={() => router.push('/profile')}
                             >
-                                <Avatar.Image
-                                    source={{ uri: user.avatar }}
+                                <ProfileAvatar
+                                    name={user.name}
+                                    avatar={user.avatar}
                                     size={60}
                                 />
                                 <View style={styles.profileInfo}>
@@ -113,8 +115,9 @@ export default function FriendsScreen() {
                                 style={styles.friendItem}
                                 onPress={() => router.push(`/friend-detail/${item.data.id}`)}
                             >
-                                <Avatar.Image
-                                    source={{ uri: item.data.avatar }}
+                                <ProfileAvatar
+                                    name={item.data.name}
+                                    avatar={item.data.avatar}
                                     size={50}
                                 />
                                 <View style={styles.friendInfo}>

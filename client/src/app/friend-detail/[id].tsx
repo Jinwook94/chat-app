@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { Avatar, Button, IconButton, TextInput, Menu } from 'react-native-paper';
+import { Button, IconButton, TextInput, Menu } from 'react-native-paper';
 import { ThemedText } from '@/src/components/ThemedText';
 import { ThemedView } from '@/src/components/ThemedView';
 import { useFriendsStore } from '@/src/stores/friendsStore';
 import { useChatStore } from '@/src/stores/chatStore';
 import { useUserStore } from '@/src/stores/userStore';
+import { ProfileAvatar } from '@/src/components/ProfileAvatar';
+import { ImagePickerModal } from '@/src/components/ImagePickerModal';
 
 export default function FriendDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
 
-    const { friends, updateFriend, removeFriend } = useFriendsStore();
+    const { friends, updateFriend, removeFriend, updateFriendAvatar } = useFriendsStore();
     const { createChatRoom, chatRooms } = useChatStore();
     const { user } = useUserStore();
 
@@ -20,6 +22,7 @@ export default function FriendDetailScreen() {
     const [name, setName] = useState(friend?.name || '');
     const [statusMessage, setStatusMessage] = useState(friend?.statusMessage || '');
     const [menuVisible, setMenuVisible] = useState(false);
+    const [imagePickerVisible, setImagePickerVisible] = useState(false);
 
     if (!friend || !user) {
         return (
@@ -56,6 +59,10 @@ export default function FriendDetailScreen() {
                 }
             ]
         );
+    };
+
+    const handleImageSelected = async (uri: string | null) => {
+        await updateFriendAvatar(id, uri);
     };
 
     const handleStartChat = () => {
@@ -132,10 +139,13 @@ export default function FriendDetailScreen() {
             />
             <ThemedView style={styles.container}>
                 <View style={styles.profileSection}>
-                    <Avatar.Image
-                        source={{ uri: friend.avatar }}
+                    <ProfileAvatar
+                        name={friend.name}
+                        avatar={friend.avatar}
                         size={120}
                         style={styles.avatar}
+                        onPress={isEditing ? () => setImagePickerVisible(true) : undefined}
+                        showEditOverlay={isEditing}
                     />
 
                     {isEditing ? (
@@ -179,6 +189,15 @@ export default function FriendDetailScreen() {
                         </TouchableOpacity>
                     </View>
                 )}
+
+                {/* 이미지 피커 모달 */}
+                <ImagePickerModal
+                    visible={imagePickerVisible}
+                    onDismiss={() => setImagePickerVisible(false)}
+                    onImageSelected={handleImageSelected}
+                    onRemoveImage={() => handleImageSelected(null)}
+                    hasExistingImage={!!friend.avatar}
+                />
             </ThemedView>
         </>
     );

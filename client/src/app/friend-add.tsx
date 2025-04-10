@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Platform } from 'react-native';
-import { Avatar, Button, IconButton, TextInput } from 'react-native-paper';
+import { Button, IconButton, TextInput } from 'react-native-paper';
 import { StatusBar } from 'expo-status-bar';
 import { Stack, router } from 'expo-router';
 import { ThemedText } from '@/src/components/ThemedText';
@@ -8,12 +8,17 @@ import { ThemedView } from '@/src/components/ThemedView';
 import { useFriendsStore } from '@/src/stores/friendsStore';
 import { KeyboardAwareScrollView } from '@/src/components/KeyboardAwareScrollView';
 import { AndroidSoftInputModes, KeyboardController } from 'react-native-keyboard-controller';
+import { ProfileAvatar } from '@/src/components/ProfileAvatar';
+import { ImagePickerModal } from '@/src/components/ImagePickerModal';
+import { getNamedAvatarUrl } from '@/src/utils/imageUtils';
 
 export default function FriendAddScreen() {
     const { addFriend } = useFriendsStore();
     const [name, setName] = useState('');
     const [statusMessage, setStatusMessage] = useState('');
-    const [avatar, setAvatar] = useState(`https://picsum.photos/id/${Math.floor(Math.random() * 100)}/200`);
+    const [avatar, setAvatar] = useState<string | undefined>(undefined);
+    const [tempImageUri, setTempImageUri] = useState<string | undefined>(undefined);
+    const [imagePickerVisible, setImagePickerVisible] = useState(false);
 
     // Android에서 adjustResize 모드 설정
     useEffect(() => {
@@ -30,19 +35,29 @@ export default function FriendAddScreen() {
     const handleAddFriend = () => {
         if (name.trim() === '') return;
 
+        // 기본 아바타가 없으면 이름 기반 아바타 생성
+        const finalAvatar = tempImageUri || avatar || (name.trim() ? getNamedAvatarUrl(name) : undefined);
+
         addFriend({
             id: Date.now().toString(),
             name,
             statusMessage,
-            avatar
+            avatar: finalAvatar
         });
 
         router.back();
     };
 
-    const handleRandomAvatar = () => {
-        setAvatar(`https://picsum.photos/id/${Math.floor(Math.random() * 100)}/200?random=${Date.now()}`);
+    const handleImageSelected = (uri: string | null) => {
+        setTempImageUri(uri || undefined);
     };
+
+    const handleRemoveImage = () => {
+        setTempImageUri(undefined);
+        setAvatar(undefined);
+    };
+
+    const displayedAvatar = tempImageUri || avatar;
 
     return (
         <>
@@ -60,15 +75,12 @@ export default function FriendAddScreen() {
             <ThemedView style={styles.container}>
                 <KeyboardAwareScrollView contentContainerStyle={styles.scrollContent}>
                     <View style={styles.avatarContainer}>
-                        <Avatar.Image
-                            source={{ uri: avatar }}
+                        <ProfileAvatar
+                            name={name || 'User'}
+                            avatar={displayedAvatar}
                             size={100}
-                        />
-                        <IconButton
-                            icon="refresh"
-                            size={24}
-                            style={styles.refreshButton}
-                            onPress={handleRandomAvatar}
+                            onPress={() => setImagePickerVisible(true)}
+                            showEditOverlay={true}
                         />
                     </View>
 
@@ -96,6 +108,15 @@ export default function FriendAddScreen() {
                         친구 추가
                     </Button>
                 </KeyboardAwareScrollView>
+
+                {/* 이미지 피커 모달 */}
+                <ImagePickerModal
+                    visible={imagePickerVisible}
+                    onDismiss={() => setImagePickerVisible(false)}
+                    onImageSelected={handleImageSelected}
+                    onRemoveImage={handleRemoveImage}
+                    hasExistingImage={!!displayedAvatar}
+                />
             </ThemedView>
         </>
     );
@@ -113,12 +134,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginVertical: 24,
         position: 'relative',
-    },
-    refreshButton: {
-        position: 'absolute',
-        bottom: 0,
-        right: '30%',
-        backgroundColor: 'white',
     },
     input: {
         marginBottom: 16,

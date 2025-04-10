@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View, StatusBar } from 'react-native';
-import { Avatar, Divider, IconButton } from 'react-native-paper';
+import { Divider, IconButton } from 'react-native-paper';
 import { router } from 'expo-router';
 import { ThemedText } from '@/src/components/ThemedText';
 import { ThemedView } from '@/src/components/ThemedView';
@@ -8,6 +8,7 @@ import { useChatStore } from '@/src/stores/chatStore';
 import { useUserStore } from '@/src/stores/userStore';
 import { useFriendsStore } from '@/src/stores/friendsStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ProfileAvatar } from '@/src/components/ProfileAvatar';
 
 export default function ChatScreen() {
     const { chatRooms, messages } = useChatStore();
@@ -89,6 +90,21 @@ export default function ChatScreen() {
         return `${msgDate.getMonth() + 1}월 ${msgDate.getDate()}일`;
     };
 
+    // 채팅방 프로필 또는 친구의 아바타 가져오기
+    const getChatAvatar = (room: typeof chatRooms[0]) => {
+        if (!user) return undefined;
+
+        if (room.isGroup) {
+            return undefined; // 그룹은 아바타 없음
+        }
+
+        const otherParticipantId = room.participants.find(id => id !== user.id);
+        if (!otherParticipantId) return undefined;
+
+        const friend = friends.find(f => f.id === otherParticipantId);
+        return friend?.avatar;
+    };
+
     return (
         <ThemedView style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
@@ -127,12 +143,7 @@ export default function ChatScreen() {
                     const lastMessage = formatLastMessage(item.id);
                     const unreadCount = getUnreadCount(item.id);
                     const lastTime = formatTime(item.lastMessage?.createdAt || item.createdAt);
-
-                    // 프로필 이미지 결정 (1:1 채팅은 상대방 이미지, 그룹은 이니셜)
-                    const isOneOnOne = !item.isGroup;
-                    const otherParticipantId = isOneOnOne ? item.participants.find(id => id !== user?.id) : null;
-                    const otherUser = otherParticipantId ? friends.find(f => f.id === otherParticipantId) : null;
-                    const profileUri = otherUser?.avatar;
+                    const avatar = getChatAvatar(item);
 
                     return (
                         <TouchableOpacity
@@ -140,11 +151,11 @@ export default function ChatScreen() {
                             onPress={() => router.push(`/chat/${item.id}`)}
                         >
                             <View style={styles.chatItemLeft}>
-                                {isOneOnOne && profileUri ? (
-                                    <Avatar.Image source={{ uri: profileUri }} size={50} />
-                                ) : (
-                                    <Avatar.Text size={50} label={chatName.substring(0, 2)} />
-                                )}
+                                <ProfileAvatar
+                                    name={chatName}
+                                    avatar={avatar}
+                                    size={50}
+                                />
                             </View>
 
                             <View style={styles.chatItemContent}>

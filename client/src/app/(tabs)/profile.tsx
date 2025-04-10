@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { Avatar, Button, TextInput, Portal, Modal } from 'react-native-paper';
+import { View, StyleSheet, Platform } from 'react-native';
+import { Button, TextInput, Portal, Modal } from 'react-native-paper';
 import ColorPicker from 'react-native-wheel-color-picker';
 import { ThemedText } from '@/src/components/ThemedText';
 import { ThemedView } from '@/src/components/ThemedView';
@@ -9,9 +9,11 @@ import { useThemeStore } from '@/src/stores/themeStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KeyboardAwareScrollView } from '@/src/components/KeyboardAwareScrollView';
 import { AndroidSoftInputModes, KeyboardController } from 'react-native-keyboard-controller';
+import { ProfileAvatar } from '@/src/components/ProfileAvatar';
+import { ImagePickerModal } from '@/src/components/ImagePickerModal';
 
 export default function ProfileScreen() {
-    const { user, updateUser } = useUserStore();
+    const { user, updateUser, updateAvatar } = useUserStore();
     const { primaryColor, setPrimaryColor } = useThemeStore();
     const insets = useSafeAreaInsets();
 
@@ -20,6 +22,7 @@ export default function ProfileScreen() {
     const [statusMessage, setStatusMessage] = useState(user?.statusMessage || '');
     const [colorPickerVisible, setColorPickerVisible] = useState(false);
     const [currentColor, setCurrentColor] = useState(primaryColor);
+    const [imagePickerVisible, setImagePickerVisible] = useState(false);
 
     // Android에서 adjustResize 모드 설정
     useEffect(() => {
@@ -49,9 +52,14 @@ export default function ProfileScreen() {
         setIsEditing(false);
     };
 
-    const handleRandomAvatar = () => {
-        const newAvatarUrl = `https://picsum.photos/id/${Math.floor(Math.random() * 100)}/200?random=${Date.now()}`;
-        updateUser({ avatar: newAvatarUrl });
+    const handleImageChange = async (uri: string | null) => {
+        if (uri) {
+            await updateAvatar(uri);
+        }
+    };
+
+    const handleRemoveAvatar = async () => {
+        await updateAvatar(null);
     };
 
     const handleColorComplete = () => {
@@ -70,16 +78,14 @@ export default function ProfileScreen() {
                 extraScrollHeight={20}
             >
                 <View style={styles.profileContainer}>
-                    <TouchableOpacity onPress={handleRandomAvatar}>
-                        <Avatar.Image
-                            source={{ uri: user.avatar }}
-                            size={120}
-                            style={styles.avatar}
-                        />
-                        <View style={styles.avatarOverlay}>
-                            <ThemedText style={styles.avatarText}>변경</ThemedText>
-                        </View>
-                    </TouchableOpacity>
+                    <ProfileAvatar
+                        name={user.name}
+                        avatar={user.avatar}
+                        size={120}
+                        style={styles.avatar}
+                        onPress={() => setImagePickerVisible(true)}
+                        showEditOverlay={true}
+                    />
 
                     {isEditing ? (
                         <View style={styles.editContainer}>
@@ -136,16 +142,26 @@ export default function ProfileScreen() {
                 <View style={styles.settingsContainer}>
                     <ThemedText type="subtitle" style={styles.settingsTitle}>앱 설정</ThemedText>
 
-                    <TouchableOpacity
+                    <View
                         style={styles.settingItem}
-                        onPress={() => setColorPickerVisible(true)}
+                        onTouchEnd={() => setColorPickerVisible(true)}
                     >
                         <ThemedText>앱 테마 색상</ThemedText>
                         <View style={[styles.colorPreview, { backgroundColor: primaryColor }]} />
-                    </TouchableOpacity>
+                    </View>
                 </View>
             </KeyboardAwareScrollView>
 
+            {/* 이미지 선택 모달 */}
+            <ImagePickerModal
+                visible={imagePickerVisible}
+                onDismiss={() => setImagePickerVisible(false)}
+                onImageSelected={handleImageChange}
+                onRemoveImage={handleRemoveAvatar}
+                hasExistingImage={!!user.avatar}
+            />
+
+            {/* 색상 선택 모달 */}
             <Portal>
                 <Modal
                     visible={colorPickerVisible}
@@ -207,21 +223,6 @@ const styles = StyleSheet.create({
     },
     avatar: {
         marginBottom: 16,
-    },
-    avatarOverlay: {
-        position: 'absolute',
-        bottom: 16,
-        right: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        borderRadius: 15,
-        width: 50,
-        height: 30,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    avatarText: {
-        color: 'white',
-        fontSize: 12,
     },
     infoContainer: {
         alignItems: 'center',
