@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
     View, StyleSheet, FlatList, Platform, TextInput as RNTextInput,
-    TouchableOpacity, StatusBar, Keyboard, TouchableWithoutFeedback
+    TouchableOpacity, StatusBar, Keyboard, TouchableWithoutFeedback, Text, Modal
 } from 'react-native';
-import { IconButton, Avatar } from 'react-native-paper';
+import { IconButton, Avatar, Menu, Dialog, Portal, Button } from 'react-native-paper';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/src/components/ThemedText';
 import { ThemedView } from '@/src/components/ThemedView';
@@ -20,7 +20,7 @@ import {ProfileAvatar} from "@/src/components/ProfileAvatar";
 
 export default function ChatDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
-    const { chatRooms, messages, sendMessage, markMessagesAsRead } = useChatStore();
+    const { chatRooms, messages, sendMessage, markMessagesAsRead, updateChatRoom, leaveChat } = useChatStore();
     const { user } = useUserStore();
     const { friends } = useFriendsStore();
     const insets = useSafeAreaInsets();
@@ -31,7 +31,16 @@ export default function ChatDetailScreen() {
     const [messageText, setMessageText] = useState('');
     const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
     const messageInputRef = useRef<RNTextInput>(null);
+    const chatNameInputRef = useRef<RNTextInput>(null);
     const flatListRef = useRef<FlatList>(null);
+
+    // 메뉴 관련 상태
+    const [menuVisible, setMenuVisible] = useState(false);
+    const [editNameModalVisible, setEditNameModalVisible] = useState(false);
+    const [exitDialogVisible, setExitDialogVisible] = useState(false);
+    const [newChatName, setNewChatName] = useState('');
+    // 1:1 채팅방에서 커스텀 이름 사용 여부 추적
+    const [hasCustomName, setHasCustomName] = useState(false);
 
     const isIOS = Platform.OS === 'ios';
 
@@ -82,6 +91,29 @@ export default function ChatDetailScreen() {
         }
     }, [id]);
 
+    // 채팅방 이름 초기화 및 커스텀 이름 상태 확인
+    useEffect(() => {
+        if (chatRoom) {
+            // 1:1 채팅방이고 customName이 있으면 커스텀 이름 사용
+            if (!chatRoom.isGroup && chatRoom.customName) {
+                setNewChatName(chatRoom.customName);
+                setHasCustomName(true);
+            } else {
+                setNewChatName(getChatName());
+                setHasCustomName(!!chatRoom.customName);
+            }
+        }
+    }, [chatRoom]);
+
+    // 모달이 열릴 때 input에 focus를 주기 위한 useEffect
+    useEffect(() => {
+        if (editNameModalVisible && chatNameInputRef.current) {
+            setTimeout(() => {
+                chatNameInputRef.current?.focus();
+            }, 100);
+        }
+    }, [editNameModalVisible]);
+
     if (!chatRoom || !user) {
         return (
             <ThemedView style={styles.container}>
@@ -92,13 +124,61 @@ export default function ChatDetailScreen() {
 
     // 채팅방 이름 표시
     const getChatName = () => {
+        // 그룹 채팅방이거나 커스텀 이름이 있으면 해당 이름 사용
         if (chatRoom.isGroup) return chatRoom.name;
+        if (chatRoom.customName) return chatRoom.customName;
 
+        // 1:1 채팅은 상대방 이름 반환
         const otherParticipantId = chatRoom.participants.find(partId => partId !== user.id);
         if (!otherParticipantId) return '채팅';
 
         const otherUser = friends.find(friend => friend.id === otherParticipantId);
         return otherUser ? otherUser.name : '알 수 없음';
+    };
+
+    // 채팅방 이름 수정 모달 열기
+    const openEditNameModal = () => {
+        setMenuVisible(false);
+        // 모달을 열기 전에 현재 채팅방 이름으로 초기화
+        if (chatRoom.isGroup) {
+            setNewChatName(chatRoom.name);
+        } else {
+            setNewChatName(chatRoom.customName || getChatName());
+        }
+        setEditNameModalVisible(true);
+    };
+
+    // 채팅방 이름 수정 처리
+    const handleUpdateChatName = () => {
+        if (!newChatName.trim() || !chatRoom) return;
+
+        if (chatRoom.isGroup) {
+            // 그룹 채팅방은 name 필드 수정
+            updateChatRoom(id, { name: newChatName });
+        } else {
+            // 1:1 채팅방은 customName 필드 사용
+            updateChatRoom(id, { customName: newChatName });
+            setHasCustomName(true);
+        }
+
+        setEditNameModalVisible(false);
+    };
+
+    // 채팅방 이름 초기화 처리 (1:1 채팅에서만 사용)
+    const handleResetChatName = () => {
+        if (!chatRoom || chatRoom.isGroup) return;
+
+        updateChatRoom(id, { customName: undefined });
+        setHasCustomName(false);
+        setEditNameModalVisible(false);
+    };
+
+    // 채팅방 나가기 처리
+    const handleExitChat = () => {
+        if (!chatRoom) return;
+
+        leaveChat(id);
+        router.replace('/chat');
     };
 
     // 메시지 전송
@@ -233,7 +313,34 @@ export default function ChatDetailScreen() {
                     headerRight: () => (
                         <View style={styles.headerRight}>
                             <IconButton icon="magnify" size={22} iconColor="#000" style={{ margin: 0 }} />
-                            <IconButton icon="menu" size={22} iconColor="#000" style={{ margin: 0 }} />
+                            <Menu
+                                visible={menuVisible}
+                                onDismiss={() => setMenuVisible(false)}
+                                anchor={
+                                    <IconButton
+                                        icon="menu"
+                                        size={22}
+                                        iconColor="#000"
+                                        style={{ margin: 0 }}
+                                        onPress={() => setMenuVisible(true)}
+                                    />
+                                }
+                            >
+                                {/* 모든 채팅방에서 이름 수정 가능하도록 수정 */}
+                                <Menu.Item
+                                    title="채팅방 이름 수정"
+                                    leadingIcon="pencil"
+                                    onPress={openEditNameModal}
+                                />
+                                <Menu.Item
+                                    title="채팅방 나가기"
+                                    leadingIcon="exit-to-app"
+                                    onPress={() => {
+                                        setMenuVisible(false);
+                                        setExitDialogVisible(true);
+                                    }}
+                                />
+                            </Menu>
                         </View>
                     ),
                 }}
@@ -378,6 +485,75 @@ export default function ChatDetailScreen() {
                     </View>
                 </View>
             </KeyboardAvoidingView>
+
+            {/* 채팅방 이름 수정 모달 - React Native Paper 대신 네이티브 모달 사용 */}
+            <Modal
+                visible={editNameModalVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setEditNameModalVisible(false)}
+            >
+                <TouchableWithoutFeedback onPress={() => setEditNameModalVisible(false)}>
+                    <View style={styles.modalOverlay}>
+                        <TouchableWithoutFeedback>
+                            <View style={styles.modalContent}>
+                                <View style={styles.modalHeader}>
+                                    <ThemedText style={styles.modalTitle}>채팅방 이름 수정</ThemedText>
+                                </View>
+
+                                <View style={styles.modalBody}>
+                                    <RNTextInput
+                                        ref={chatNameInputRef}
+                                        style={styles.modalInput}
+                                        value={newChatName}
+                                        onChangeText={setNewChatName}
+                                        placeholder="채팅방 이름을 입력하세요"
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                    />
+                                </View>
+
+                                <View style={styles.modalFooter}>
+                                    {!chatRoom.isGroup && hasCustomName && (
+                                        <TouchableOpacity
+                                            style={styles.modalButton}
+                                            onPress={handleResetChatName}
+                                        >
+                                            <ThemedText>초기화</ThemedText>
+                                        </TouchableOpacity>
+                                    )}
+                                    <TouchableOpacity
+                                        style={styles.modalButton}
+                                        onPress={() => setEditNameModalVisible(false)}
+                                    >
+                                        <ThemedText>취소</ThemedText>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.modalButton, styles.primaryButton]}
+                                        onPress={handleUpdateChatName}
+                                    >
+                                        <ThemedText style={styles.primaryButtonText}>저장</ThemedText>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </TouchableWithoutFeedback>
+                    </View>
+                </TouchableWithoutFeedback>
+            </Modal>
+
+            {/* 채팅방 나가기 확인 다이얼로그 */}
+            <Portal>
+                <Dialog visible={exitDialogVisible} onDismiss={() => setExitDialogVisible(false)}>
+                    <Dialog.Title>채팅방 나가기</Dialog.Title>
+                    <Dialog.Content>
+                        <Text>정말 이 채팅방을 나가시겠습니까?</Text>
+                    </Dialog.Content>
+                    <Dialog.Actions>
+                        <Button onPress={() => setExitDialogVisible(false)}>취소</Button>
+                        <Button onPress={handleExitChat}>나가기</Button>
+                    </Dialog.Actions>
+                </Dialog>
+            </Portal>
         </View>
     );
 }
@@ -519,5 +695,57 @@ const styles = StyleSheet.create({
     },
     inputButton: {
         margin: 0,
+    },
+    // 모달 스타일
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContent: {
+        width: '80%',
+        backgroundColor: 'white',
+        borderRadius: 10,
+        overflow: 'hidden',
+    },
+    modalHeader: {
+        padding: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        textAlign: 'center',
+    },
+    modalBody: {
+        padding: 15,
+    },
+    modalInput: {
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 5,
+        padding: 10,
+        fontSize: 16,
+    },
+    modalFooter: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        padding: 15,
+        borderTopWidth: 1,
+        borderTopColor: '#eee',
+    },
+    modalButton: {
+        paddingHorizontal: 15,
+        paddingVertical: 8,
+        marginLeft: 10,
+    },
+    primaryButton: {
+        backgroundColor: '#0a7ea4',
+        borderRadius: 5,
+    },
+    primaryButtonText: {
+        color: 'white',
     },
 });

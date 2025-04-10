@@ -27,4 +27,5 @@ export interface ChatRoom {
     isGroup: boolean;
     backgroundColor?: string;
     createdAt: number;
+    customName?: string; // 1:1 채팅방에서의 사용자 지정 이름
 }

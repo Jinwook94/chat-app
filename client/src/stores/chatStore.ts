@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import {getItemSync, setItem, setItemSync} from '../services/storage';
+import { getItemSync, setItem, setItemSync } from '../services/storage';
 import { ChatRoom, Message } from '../types/models';
 import { useUserStore } from './userStore';
 
@@ -12,6 +12,7 @@ interface ChatState {
     sendMessage: (chatId: string, text: string, imageUrl?: string, videoUrl?: string) => void;
     markMessagesAsRead: (chatId: string) => void;
     setChatBackgroundColor: (chatId: string, color: string) => void;
+    leaveChat: (chatId: string) => void; // 추가된 함수
 }
 
 // 샘플 채팅방 데이터
@@ -190,5 +191,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
             );
             setItemSync('chatRooms', updatedChatRooms);
             return { chatRooms: updatedChatRooms };
-        })
+        }),
+
+    // 채팅방 나가기 함수 추가
+    leaveChat: (chatId) =>
+        set((state) => {
+            const updatedChatRooms = state.chatRooms.filter(room => room.id !== chatId);
+
+            // 채팅방 메시지도 제거
+            const { [chatId]: removedMessages, ...remainingMessages } = state.messages;
+
+            setItemSync('chatRooms', updatedChatRooms);
+            setItemSync('messages', remainingMessages);
+
+            return {
+                chatRooms: updatedChatRooms,
+                messages: remainingMessages
+            };
+        }),
 }));
