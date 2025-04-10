@@ -116,6 +116,15 @@ export default function ChatDetailScreen() {
         }
     };
 
+    const handleAvatarPress = (senderId: string) => {
+        // Don't navigate if the sender is the current user
+        if (senderId === user.id) {
+            router.push('/my-profile-detail');
+        } else {
+            router.push(`/friend-detail/${senderId}`);
+        }
+    };
+
     // 시간 형식화
     const formatTime = (timestamp: number) => {
         const date = new Date(timestamp);
@@ -277,6 +286,7 @@ export default function ChatDetailScreen() {
                                                         avatar={getProfileImage(item.senderId)}
                                                         size={36}
                                                         style={styles.avatar}
+                                                        onPress={() => handleAvatarPress(item.senderId)}
                                                     />
                                                 ) : (
                                                     <View style={styles.avatarPlaceholder} />
