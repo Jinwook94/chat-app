@@ -85,6 +85,7 @@ export default function ProfileScreen() {
                         style={styles.avatar}
                         onPress={() => setImagePickerVisible(true)}
                         showEditOverlay={true}
+                        isUserProfile={true}
                     />
 
                     {isEditing ? (

@@ -177,6 +177,7 @@ export const ProfileDetailView = ({
                             avatar={avatar}
                             size={100}
                             isRounded={true}
+                            isUserProfile={isMyProfile}
                         />
                         <View style={styles.nameContainer}>
                             <ThemedText style={styles.name}>{name}</ThemedText>

@@ -35,8 +35,8 @@ export default function FriendAddScreen() {
     const handleAddFriend = () => {
         if (name.trim() === '') return;
 
-        // 기본 아바타가 없으면 이름 기반 아바타 생성
-        const finalAvatar = tempImageUri || avatar || (name.trim() ? getNamedAvatarUrl(name) : undefined);
+        // 사용자가 직접 선택한 이미지만 사용하고, 없으면 undefined 설정
+        const finalAvatar = tempImageUri || avatar;
 
         addFriend({
             id: Date.now().toString(),

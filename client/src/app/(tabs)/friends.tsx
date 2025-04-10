@@ -100,6 +100,7 @@ export default function FriendsScreen() {
                                     name={user.name}
                                     avatar={user.avatar}
                                     size={60}
+                                    isUserProfile={true} // 내 프로필임을 표시
                                 />
                                 <View style={styles.profileInfo}>
                                     <ThemedText style={styles.myName}>{user.name}</ThemedText>
@@ -119,6 +120,7 @@ export default function FriendsScreen() {
                                     name={item.data.name}
                                     avatar={item.data.avatar}
                                     size={50}
+                                    isUserProfile={false}
                                 />
                                 <View style={styles.friendInfo}>
                                     <ThemedText style={styles.friendName}>{item.data.name}</ThemedText>

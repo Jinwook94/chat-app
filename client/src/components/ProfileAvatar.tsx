@@ -9,6 +9,7 @@ interface ProfileAvatarProps {
     style?: StyleProp<ViewStyle>;
     showEditOverlay?: boolean;
     isRounded?: boolean; // Controls rounded square vs circle
+    isUserProfile?: boolean; // 사용자 본인 프로필인지 여부
 }
 
 export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
@@ -19,6 +20,7 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
                                                                 style,
                                                                 showEditOverlay = false,
                                                                 isRounded = false,
+                                                                isUserProfile = false, // 기본값은 false (친구 프로필)
                                                             }) => {
     // Create initials from name
     const initials = name
@@ -32,12 +34,15 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
     // Increased to 0.4 (40%) from 0.25 to get the Kakao "squircle" look
     const borderRadius = isRounded ? size * 0.4 : size / 2;
 
+    // 사용자/친구에 따라 다른 배경색 사용
+    const bgColor = isUserProfile ? '#a0b4d6' : '#8cd3f8';
+
     // Container style
     const containerStyle: ViewStyle = {
         width: size,
         height: size,
         borderRadius: borderRadius,
-        backgroundColor: avatar ? undefined : '#a0b4d6', // Kakao's light blue color
+        backgroundColor: avatar ? undefined : bgColor, // 아바타가 없을 때만 배경색 적용
         justifyContent: 'center',
         alignItems: 'center',
         overflow: 'hidden' as const,
@@ -121,7 +126,7 @@ const kakaoAvatarStyles = StyleSheet.create({
         width: '30%',
         height: '30%',
         borderRadius: 50,
-        backgroundColor: '#d6e2f3',
+        backgroundColor: '#ffffff', // 흰색 머리
         marginBottom: '5%',
     },
     body: {
@@ -129,7 +134,7 @@ const kakaoAvatarStyles = StyleSheet.create({
         height: '25%',
         borderTopLeftRadius: 50,
         borderTopRightRadius: 50,
-        backgroundColor: '#d6e2f3',
+        backgroundColor: '#ffffff', // 흰색 몸통
     },
 });
 

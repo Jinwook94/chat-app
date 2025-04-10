@@ -126,12 +126,9 @@ export const deleteImage = async (imageUri: string): Promise<boolean> => {
     }
 };
 
-/**
- * 기본 프로필 이미지 URL을 반환합니다.
- * @returns 기본 프로필 이미지 URL
- */
-export const getDefaultProfileImage = (): string => {
-    return 'https://ui-avatars.com/api/?background=random&name=User&size=200';
+export const getDefaultProfileImage = (): null => {
+    // null 반환하여 기본 실루엣 아바타가 표시되도록 함
+    return null;
 };
 
 /**

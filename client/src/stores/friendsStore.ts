@@ -19,19 +19,16 @@ const initialFriends: Friend[] = [
     {
         id: '1',
         name: '김철수',
-        avatar: 'https://picsum.photos/id/1/200',
         statusMessage: '오늘도 좋은 하루!'
     },
     {
         id: '2',
         name: '이영희',
-        avatar: 'https://picsum.photos/id/2/200',
         statusMessage: '열심히 공부중입니다.'
     },
     {
         id: '3',
         name: '박지성',
-        avatar: 'https://picsum.photos/id/3/200',
         statusMessage: '축구는 인생이다!'
     }
 ];
